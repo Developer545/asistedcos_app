@@ -1,20 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { ok, created, apiError, paginate, parsePagination } from '@/lib/response';
+import { created, apiError, paginate, parsePagination } from '@/lib/response';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
-    const { page, limit } = parsePagination(req.nextUrl.searchParams);
+    const { page, limit, skip } = parsePagination(req);
     const status = req.nextUrl.searchParams.get('status') ?? undefined;
     const where = status ? { status: status as 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'PAGADO' } : {};
     const [data, total] = await Promise.all([
       prisma.expense.findMany({
         where, orderBy: { date: 'desc' },
-        skip: (page - 1) * limit, take: limit,
+        skip, take: limit,
         include: {
           category: { select: { id: true, name: true } },
           project:  { select: { id: true, name: true } },
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.expense.count({ where }),
     ]);
-    return NextResponse.json(ok(data, paginate(total, page, limit)));
+    return paginate(data, total, page, limit);
   } catch (err) { return apiError(err); }
 }
 
@@ -52,6 +52,6 @@ export async function POST(req: NextRequest) {
         project:  { select: { id: true, name: true } },
       },
     });
-    return NextResponse.json(created(expense));
+    return created(expense);
   } catch (err) { return apiError(err); }
 }

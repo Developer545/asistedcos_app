@@ -140,7 +140,7 @@ export default function ReportesPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border-default))" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: number) => fmtUSD(v)} />
+                    <Tooltip formatter={(v) => fmtUSD(Number(v))} />
                     <Legend />
                     <Bar dataKey="donaciones" name="Donaciones" fill="hsl(var(--status-success))" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="gastos" name="Gastos" fill="hsl(var(--status-error))" radius={[4, 4, 0, 0]} />
@@ -217,7 +217,7 @@ export default function ReportesPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border-default))" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v: number) => fmtUSD(v)} />
+                    <Tooltip formatter={(v) => fmtUSD(Number(v))} />
                     <Legend />
                     <Line type="monotone" dataKey="donaciones" name="Donaciones"
                       stroke="hsl(var(--status-success))" strokeWidth={2} dot={{ r: 3 }} />

@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const productId = req.nextUrl.searchParams.get('productId') ?? '';
     if (!productId) return apiError('productId requerido', 400);
     const kardex = await prisma.kardex.findMany({
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body = await req.json();
     const { productId, type, quantity, reference, notes, date } = body;
     if (!productId) return apiError('productId requerido', 400);

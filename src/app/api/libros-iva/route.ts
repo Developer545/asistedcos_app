@@ -7,7 +7,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const book  = req.nextUrl.searchParams.get('book')  ?? 'VENTAS'; // VENTAS | COMPRAS
     const month = parseInt(req.nextUrl.searchParams.get('month') ?? String(new Date().getMonth() + 1));
     const year  = parseInt(req.nextUrl.searchParams.get('year')  ?? String(new Date().getFullYear()));

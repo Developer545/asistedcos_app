@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const payroll = await prisma.payroll.findUnique({
       where: { id },
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const { status } = await req.json();
     const payroll = await prisma.payroll.update({
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const p = await prisma.payroll.findUnique({ where: { id } });
     if (p?.status !== 'BORRADOR') return apiError('Solo se pueden eliminar planillas en Borrador', 400);

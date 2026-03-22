@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const acta = await prisma.actaRecord.findUnique({ where: { id } });
     if (!acta) return apiError('Acta no encontrada', 404);
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const body = await req.json();
     const { number, title, date, attendees, agenda, agreements, fileUrl } = body;
@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     await prisma.actaRecord.delete({ where: { id } });
     return ok({ deleted: true });

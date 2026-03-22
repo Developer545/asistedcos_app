@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
     const dteType = req.nextUrl.searchParams.get('dteType') ?? '';
     const status  = req.nextUrl.searchParams.get('status')  ?? '';
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body = await req.json();
     const {
       dteType, date,

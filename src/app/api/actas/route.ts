@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
     const search = req.nextUrl.searchParams.get('search') ?? '';
     const year   = req.nextUrl.searchParams.get('year')   ?? '';
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body = await req.json();
     const { number, title, date, attendees, agenda, agreements, notes, fileUrl } = body;
     if (!number?.trim()) return apiError('El número de acta es requerido', 400);

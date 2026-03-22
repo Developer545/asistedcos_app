@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const invoice = await prisma.invoice.findUnique({
       where: { id },
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const { status, voidReason } = await req.json();
     const invoice = await prisma.invoice.update({
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const inv = await prisma.invoice.findUnique({ where: { id } });
     if (inv?.status === 'EMITIDO') return apiError('No se puede eliminar un documento emitido', 400);

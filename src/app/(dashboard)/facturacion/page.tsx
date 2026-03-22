@@ -221,7 +221,7 @@ export default function FacturacionPage() {
         <Form form={form} layout="vertical" onFinish={onSave} style={{ marginTop: 8 }}>
           <Form.Item name="dteType" hidden initialValue={tab}><Input /></Form.Item>
 
-          <Divider orientation="left" style={{ fontSize: 12, margin: '4px 0 10px' }}>Receptor</Divider>
+          <Divider style={{ fontSize: 12, margin: '4px 0 10px' }}>Receptor</Divider>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="receiverName" label="Nombre / Razón social"
@@ -260,7 +260,7 @@ export default function FacturacionPage() {
             </Col>
           </Row>
 
-          <Divider orientation="left" style={{ fontSize: 12, margin: '4px 0 10px' }}>Detalle</Divider>
+          <Divider style={{ fontSize: 12, margin: '4px 0 10px' }}>Detalle</Divider>
 
           {lines.map((line, i) => (
             <Row key={i} gutter={8} align="middle" style={{ marginBottom: 8 }}>

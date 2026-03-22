@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
     const search = req.nextUrl.searchParams.get('search') ?? '';
     const where  = search
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body = await req.json();
     const { title, slug, summary, body: content, coverImage, published } = body;
     if (!title?.trim()) return apiError('El título es requerido', 400);

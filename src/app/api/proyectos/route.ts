@@ -1,27 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { ok, created, apiError, paginate, parsePagination } from '@/lib/response';
+import { created, apiError, paginate, parsePagination } from '@/lib/response';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
-    const { page, limit } = parsePagination(req.nextUrl.searchParams);
+    const { page, limit, skip } = parsePagination(req);
     const activeOnly = req.nextUrl.searchParams.get('active') === 'true';
     const where = activeOnly ? { active: true } : {};
     const [data, total] = await Promise.all([
       prisma.project.findMany({
         where, orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit, take: limit,
+        skip, take: limit,
         include: {
           _count: { select: { donations: true, participations: true } },
         },
       }),
       prisma.project.count({ where }),
     ]);
-    return NextResponse.json(ok(data, paginate(total, page, limit)));
+    return paginate(data, total, page, limit);
   } catch (err) { return apiError(err); }
 }
 
@@ -41,6 +41,6 @@ export async function POST(req: NextRequest) {
         budget:    budget ? parseFloat(budget) : 0,
       },
     });
-    return NextResponse.json(created(project));
+    return created(project);
   } catch (err) { return apiError(err); }
 }

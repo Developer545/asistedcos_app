@@ -155,7 +155,7 @@ export default function ConfiguracionPage() {
       key: 'org', label: 'Organización',
       children: (
         <Form form={orgForm} layout="vertical" onFinish={saveOrg} style={{ maxWidth: 680 }}>
-          <Divider orientation="left">Información general</Divider>
+          <Divider>Información general</Divider>
           <Form.Item name="org_name" label="Nombre de la organización">
             <Input placeholder="Fundación ASISTEDCOS" />
           </Form.Item>
@@ -194,7 +194,7 @@ export default function ConfiguracionPage() {
         <Form form={fiscalForm} layout="vertical" onFinish={saveFiscal} style={{ maxWidth: 680 }}>
           <Alert type="info" showIcon style={{ marginBottom: 16 }}
             message="Estos datos se usan como emisor en todos los DTE (Facturas, CCF, Retenciones, etc.)" />
-          <Divider orientation="left">Identificación tributaria</Divider>
+          <Divider>Identificación tributaria</Divider>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="org_nit" label="NIT de la organización">
@@ -207,7 +207,7 @@ export default function ConfiguracionPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Divider orientation="left">Representante legal</Divider>
+          <Divider>Representante legal</Divider>
           <Row gutter={12}>
             <Col span={14}>
               <Form.Item name="org_rep_legal" label="Nombre del representante legal">
@@ -220,7 +220,7 @@ export default function ConfiguracionPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Divider orientation="left">Facturación</Divider>
+          <Divider>Facturación</Divider>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="org_cod_act" label="Código de actividad económica">
@@ -262,12 +262,12 @@ export default function ConfiguracionPage() {
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
             message="Información del sistema"
             description="ASISTEDCOS Admin ERP — Software donado. Para soporte técnico contactar al desarrollador." />
-          <Divider orientation="left">Información</Divider>
+          <Divider>Información</Divider>
           <p><b>Stack:</b> Next.js 16 + Prisma + Neon PostgreSQL + Ant Design</p>
           <p><b>Base de datos:</b> Neon PostgreSQL (serverless)</p>
           <p><b>Despliegue:</b> Vercel</p>
           <p><b>Versión:</b> 1.0.0</p>
-          <Divider orientation="left">Seguridad</Divider>
+          <Divider>Seguridad</Divider>
           <Alert type="info" showIcon
             message="Las contraseñas se almacenan con hash bcrypt. El JWT expira en 15 minutos con refresh automático." />
         </div>

@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const purchase = await prisma.purchase.findUnique({
       where: { id },
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const { status, notes, invoiceRef } = await req.json();
 
@@ -62,7 +62,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     await prisma.purchase.delete({ where: { id } });
     return ok({ deleted: true });

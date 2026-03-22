@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { ok, created, apiError, paginate, parsePagination } from '@/lib/response';
+import { created, apiError, paginate, parsePagination } from '@/lib/response';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
 
-    const { page, limit } = parsePagination(req.nextUrl.searchParams);
+    const { page, limit, skip } = parsePagination(req);
     const search = req.nextUrl.searchParams.get('search') ?? '';
 
     const where = search
@@ -24,14 +24,14 @@ export async function GET(req: NextRequest) {
       prisma.donor.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
+        skip,
         take: limit,
         include: { _count: { select: { donations: true } } },
       }),
       prisma.donor.count({ where }),
     ]);
 
-    return NextResponse.json(ok(data, paginate(total, page, limit)));
+    return paginate(data, total, page, limit);
   } catch (err) { return apiError(err); }
 }
 
@@ -51,6 +51,6 @@ export async function POST(req: NextRequest) {
               address: address || null, isCompany: !!isCompany, notes: notes || null },
     });
 
-    return NextResponse.json(created(donor));
+    return created(donor);
   } catch (err) { return apiError(err); }
 }

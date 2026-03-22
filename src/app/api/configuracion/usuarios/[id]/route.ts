@@ -8,7 +8,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    const me = await getCurrentUser(req);
+    const me = await getCurrentUser();
+    if (!me) return apiError('No autorizado', 401);
     if (me.role !== 'ADMIN') return apiError('Solo ADMIN', 403);
     const { id } = await ctx.params;
     const { name, role, active, password } = await req.json();
@@ -24,7 +25,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    const me = await getCurrentUser(req);
+    const me = await getCurrentUser();
+    if (!me) return apiError('No autorizado', 401);
     if (me.role !== 'ADMIN') return apiError('Solo ADMIN', 403);
     const { id } = await ctx.params;
     if (id === me.sub) return apiError('No puedes eliminarte a ti mismo', 400);

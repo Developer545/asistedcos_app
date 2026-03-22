@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/auth';
 // GET → todos los configs de la org
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const configs = await prisma.orgConfig.findMany({ orderBy: { key: 'asc' } });
     const map     = Object.fromEntries(configs.map(c => [c.key, c.value]));
     return ok(map);
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 // PUT → upsert batch de configs
 export async function PUT(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body: Record<string, string> = await req.json();
 
     await prisma.$transaction(

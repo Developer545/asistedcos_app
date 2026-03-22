@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { ok, created, apiError, paginate, parsePagination } from '@/lib/response';
+import { created, apiError, paginate, parsePagination } from '@/lib/response';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
-    const { page, limit } = parsePagination(req.nextUrl.searchParams);
+    const { page, limit, skip } = parsePagination(req);
     const [data, total] = await Promise.all([
-      prisma.member.findMany({ orderBy: { name: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.member.findMany({ orderBy: { name: 'asc' }, skip, take: limit }),
       prisma.member.count(),
     ]);
-    return NextResponse.json(ok(data, paginate(total, page, limit)));
+    return paginate(data, total, page, limit);
   } catch (err) { return apiError(err); }
 }
 
@@ -35,6 +35,6 @@ export async function POST(req: NextRequest) {
         notes: notes || null,
       },
     });
-    return NextResponse.json(created(member));
+    return created(member);
   } catch (err) { return apiError(err); }
 }

@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const supplier = await prisma.supplier.findUnique({
       where: { id },
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const body = await req.json();
     const { name, nrc, nit, dui, email, phone, address, contact, active, notes } = body;
@@ -34,7 +34,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     await prisma.supplier.delete({ where: { id } });
     return ok({ deleted: true });

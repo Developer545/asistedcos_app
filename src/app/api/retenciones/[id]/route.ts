@@ -7,7 +7,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const cert = await prisma.retentionCert.findUnique({ where: { id } });
     if (!cert) return apiError('Retención no encontrada', 404);
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const { status, notes } = await req.json();
     const cert = await prisma.retentionCert.update({
@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { id } = await ctx.params;
     const cert = await prisma.retentionCert.findUnique({ where: { id } });
     if (cert?.status === 'EMITIDO') return apiError('No se puede eliminar un comprobante emitido', 400);

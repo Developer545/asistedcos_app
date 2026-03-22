@@ -6,7 +6,8 @@ import bcrypt from 'bcryptjs';
 
 export async function GET(req: NextRequest) {
   try {
-    const me = await getCurrentUser(req);
+    const me = await getCurrentUser();
+    if (!me) return apiError('No autorizado', 401);
     if (me.role !== 'ADMIN') return apiError('Solo ADMIN puede ver usuarios', 403);
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
@@ -18,7 +19,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const me = await getCurrentUser(req);
+    const me = await getCurrentUser();
+    if (!me) return apiError('No autorizado', 401);
     if (me.role !== 'ADMIN') return apiError('Solo ADMIN puede crear usuarios', 403);
     const { name, email, password, role } = await req.json();
     if (!name || !email || !password) return apiError('Nombre, correo y contraseña son requeridos', 400);

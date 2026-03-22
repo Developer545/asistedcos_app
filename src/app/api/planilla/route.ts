@@ -6,7 +6,7 @@ import { calcularDetalle } from '@/lib/planilla';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
     const [data, total] = await prisma.$transaction([
       prisma.payroll.findMany({
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body = await req.json();
     const { month, year, employees } = body;
 

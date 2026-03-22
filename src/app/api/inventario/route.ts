@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
     const search    = req.nextUrl.searchParams.get('search')    ?? '';
     const projectId = req.nextUrl.searchParams.get('projectId') ?? '';
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await getCurrentUser(req);
+    await getCurrentUser();
     const body = await req.json();
     const { code, name, description, unit, minStock, projectId } = body;
     if (!code?.trim()) return apiError('El código es requerido', 400);
