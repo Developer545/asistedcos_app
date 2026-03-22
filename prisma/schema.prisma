@@ -686,6 +686,7 @@ model WebNews {
   slug        String   @unique
   summary     String?
   body        String
+  categoria   String?  // e.g. "Proyectos", "Eventos", "Logros", "Comunidades"
   coverImage  String?
   published   Boolean  @default(false)
   publishedAt DateTime?

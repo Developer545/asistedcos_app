@@ -23,13 +23,13 @@ export async function POST(req: NextRequest) {
   try {
     await getCurrentUser();
     const body = await req.json();
-    const { title, slug, summary, body: content, coverImage, published } = body;
+    const { title, slug, summary, body: content, categoria, coverImage, published } = body;
     if (!title?.trim()) return apiError('El título es requerido', 400);
     if (!slug?.trim())  return apiError('El slug es requerido', 400);
     const news = await prisma.webNews.create({
       data: {
         title, slug, summary, body: content ?? '',
-        coverImage, published: published ?? false,
+        categoria, coverImage, published: published ?? false,
         publishedAt: published ? new Date() : null,
       },
     });

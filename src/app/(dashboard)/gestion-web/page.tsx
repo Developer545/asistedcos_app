@@ -4,11 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
   Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
-  InputNumber, Spin, Progress,
+  InputNumber, Spin, Progress, Select,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  Globe, PencilSimple, Trash, MagnifyingGlass, Plus,
+  Globe, PencilSimple, Trash, MagnifyingGlass, Plus, Eye,
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -18,7 +18,7 @@ import CloudinaryUpload from '@/components/shared/CloudinaryUpload';
 /* ─── Types ──────────────────────────────────────────── */
 type News = {
   id: string; title: string; slug: string; summary?: string;
-  body: string; coverImage?: string; published: boolean;
+  body: string; categoria?: string; coverImage?: string; published: boolean;
   publishedAt?: string; createdAt: string; updatedAt: string;
 };
 type WebContent = { id: string; section: string; key: string; value: string; type: string };
@@ -343,13 +343,20 @@ export default function GestionWebPage() {
 
   /* ── Table columns ─────────────────────────────────── */
   const newsCols: ColumnsType<News> = [
-    { title: 'Título', dataIndex: 'title', key: 'title', ellipsis: true },
-    { title: 'Estado', key: 'published', render: (_, r) => r.published ? <Tag color="success">Publicado</Tag> : <Tag>Borrador</Tag>, width: 110 },
-    { title: 'Fecha', dataIndex: 'createdAt', key: 'createdAt', render: v => dayjs(v).format('DD/MM/YYYY'), width: 110 },
     {
-      title: '', key: 'actions', width: 90, render: (_, r) => (
+      title: '', key: 'img', width: 56, render: (_, r) => r.coverImage
+        ? <img src={r.coverImage} alt="" style={{ width: 44, height: 32, objectFit: 'cover', borderRadius: 4 }} />
+        : <div style={{ width: 44, height: 32, borderRadius: 4, background: 'hsl(var(--bg-muted))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 16 }}>📄</span></div>
+    },
+    { title: 'Título', dataIndex: 'title', key: 'title', ellipsis: true },
+    { title: 'Categoría', dataIndex: 'categoria', key: 'categoria', width: 110, render: v => v ? <Tag color="blue">{v}</Tag> : <span style={{ color: '#ccc' }}>—</span> },
+    { title: 'Estado', key: 'published', render: (_, r) => r.published ? <Tag color="success">Publicado</Tag> : <Tag>Borrador</Tag>, width: 110 },
+    { title: 'Fecha', dataIndex: 'publishedAt', key: 'publishedAt', render: v => v ? dayjs(v).format('DD/MM/YYYY') : '—', width: 110 },
+    {
+      title: '', key: 'actions', width: 110, render: (_, r) => (
         <Space>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openNewsModal(r)} />
+          <Button size="small" icon={<Eye size={13} />} href={`https://asistedcosong.vercel.app/noticias/${r.slug}`} target="_blank" title="Ver en el sitio" />
           <Popconfirm title="¿Eliminar noticia?" onConfirm={() => deleteNews(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
           </Popconfirm>
@@ -580,11 +587,25 @@ export default function GestionWebPage() {
           <Form.Item name="summary" label="Resumen">
             <Input.TextArea rows={2} />
           </Form.Item>
-          <Form.Item name="body" label="Contenido">
-            <Input.TextArea rows={6} />
+          <Form.Item
+            name="body"
+            label="Contenido"
+            extra="Escribe el contenido completo. Separa los párrafos con una línea en blanco."
+          >
+            <Input.TextArea rows={10} placeholder={"Escribe aquí el contenido completo de la noticia...\n\nSepara los párrafos con una línea en blanco para que se vean correctamente en el sitio web."} />
           </Form.Item>
           <Form.Item name="coverImage" label="Imagen de portada">
             <CloudinaryUpload folder="asistedcos/noticias" aspectHint="16:9 recomendado" />
+          </Form.Item>
+          <Form.Item name="categoria" label="Categoría">
+            <Select placeholder="Seleccionar categoría" allowClear>
+              <Select.Option value="Proyectos">Proyectos</Select.Option>
+              <Select.Option value="Eventos">Eventos</Select.Option>
+              <Select.Option value="Logros">Logros</Select.Option>
+              <Select.Option value="Comunidades">Comunidades</Select.Option>
+              <Select.Option value="Alianzas">Alianzas</Select.Option>
+              <Select.Option value="Voluntariado">Voluntariado</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item name="published" label="Publicado" valuePropName="checked">
             <Switch />
