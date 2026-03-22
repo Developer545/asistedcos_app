@@ -705,3 +705,43 @@ model WebGallery {
 
   @@map("web_gallery")
 }
+
+model WebCause {
+  id          String   @id @default(cuid())
+  titulo      String
+  descripcion String?
+  tag         String?  // e.g. "Manglar", "Reforestación", "Agua"
+  coverImage  String?  // Cloudinary URL
+  meta        Decimal  @default(0) @db.Decimal(12, 2)
+  recaudado   Decimal  @default(0) @db.Decimal(12, 2)
+  active      Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("web_causes")
+}
+
+model WebFaq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("web_faq")
+}
+
+model WebPartner {
+  id        String   @id @default(cuid())
+  name      String
+  logo      String?  // Cloudinary URL
+  url       String?
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("web_partners")
+}

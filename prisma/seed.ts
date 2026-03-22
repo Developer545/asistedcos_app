@@ -123,6 +123,35 @@ async function main() {
   }
   console.log('✅ Categorías de gastos creadas');
 
+  /* ── WebCause (Causas homepage) ───────────────── */
+  await prisma.webCause.deleteMany();
+  await prisma.webCause.createMany({ data: [
+    { titulo: 'Conservación Costa del Bálsamo', descripcion: 'Protección y restauración del manglar en Playa San Diego, La Libertad, en alianza con Concentrix.', tag: 'Manglar', meta: 15000, recaudado: 8550, order: 1, active: true },
+    { titulo: 'Distribución de Plántulas Nativas', descripcion: 'Entregamos miles de plántulas nativas a familias rurales para reforestar sus terrenos y recuperar biodiversidad.', tag: 'Reforestación', meta: 8000, recaudado: 6560, order: 2, active: true },
+    { titulo: 'Monitoreo de Cuencas Hidrográficas', descripcion: 'Vigilancia continua de ríos y cuerpos de agua para asegurar la salud hídrica de las comunidades rurales.', tag: 'Agua', meta: 12000, recaudado: 5160, order: 3, active: true },
+  ]});
+  console.log('✅ WebCauses creadas');
+
+  /* ── WebFaq ────────────────────────────────────── */
+  await prisma.webFaq.deleteMany();
+  await prisma.webFaq.createMany({ data: [
+    { question: '¿Cómo puedo donar a ASISTEDCOS?', answer: 'Puedes donar a través de nuestra página web usando tarjeta de crédito/débito, o contactarnos directamente por WhatsApp para coordinar una transferencia bancaria.', order: 1, active: true },
+    { question: '¿Son deducibles de impuestos mis donaciones?', answer: 'Sí. ASISTEDCOS es una fundación sin fines de lucro legalmente reconocida en El Salvador. Emitimos recibos oficiales que pueden utilizarse para deducciones fiscales conforme a la Ley de Impuesto sobre la Renta.', order: 2, active: true },
+    { question: '¿Cómo puedo ser voluntario?', answer: 'Puedes registrarte a través de nuestro formulario de contacto o escribirnos por WhatsApp. Organizamos jornadas de reforestación, limpieza de playas y monitoreo ambiental a lo largo del año.', order: 3, active: true },
+    { question: '¿En qué zonas trabajan?', answer: 'Trabajamos principalmente en La Libertad, Sonsonate y La Paz — departamentos costeros de El Salvador con alta biodiversidad y comunidades rurales vulnerables.', order: 4, active: true },
+    { question: '¿Cómo pueden aliarse las empresas con ASISTEDCOS?', answer: 'Ofrecemos programas de responsabilidad social empresarial con impacto ambiental medible. Contáctenos para conocer las modalidades de alianza y los reportes de impacto que entregamos.', order: 5, active: true },
+  ]});
+  console.log('✅ WebFaqs creadas');
+
+  /* ── WebPartner ────────────────────────────────── */
+  await prisma.webPartner.deleteMany();
+  await prisma.webPartner.createMany({ data: [
+    { name: 'Concentrix El Salvador', url: 'https://concentrix.com', active: true, order: 1 },
+    { name: 'Ministerio de Medio Ambiente', url: 'https://marn.gob.sv', active: true, order: 2 },
+    { name: 'MINED', url: 'https://www.mined.gob.sv', active: true, order: 3 },
+  ]});
+  console.log('✅ WebPartners creados');
+
   console.log('\n🎉 Seed completado exitosamente.');
 }
 

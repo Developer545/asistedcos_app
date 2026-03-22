@@ -4,12 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
   Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
-  InputNumber, Spin,
+  InputNumber, Spin, Progress,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   Globe, PencilSimple, Trash, MagnifyingGlass, Plus,
-  ArrowSquareOut, Rocket, Eye,
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -24,7 +23,12 @@ type News = {
 };
 type WebContent = { id: string; section: string; key: string; value: string; type: string };
 type GalleryItem = { id: string; title?: string; url: string; category?: string; order: number; createdAt: string };
-type Project = { id: string; name: string; description?: string; coverImage?: string; active: boolean; createdAt: string };
+type Cause = {
+  id: string; titulo: string; descripcion?: string; tag?: string;
+  coverImage?: string; meta: number; recaudado: number; active: boolean; order: number;
+};
+type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
+type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
 
 function slugify(text: string) {
   return text.toLowerCase()
@@ -37,7 +41,7 @@ function slugify(text: string) {
 export default function GestionWebPage() {
   const [tab, setTab] = useState('noticias');
 
-  /* ── Noticias state ─────────────────────────────────── */
+  /* ── Noticias ─────────────────────────────────── */
   const [news, setNews] = useState<News[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsModal, setNewsModal] = useState(false);
@@ -46,13 +50,13 @@ export default function GestionWebPage() {
   const [newsSearch, setNewsSearch] = useState('');
   const [newsForm] = Form.useForm();
 
-  /* ── WebContent state ───────────────────────────────── */
+  /* ── WebContent ─────────────────────────────────── */
   const [content, setContent] = useState<WebContent[]>([]);
   const [contentLoading, setContentLoading] = useState(false);
   const [contentSaving, setContentSaving] = useState(false);
   const [contentForm] = Form.useForm();
 
-  /* ── Galería state ──────────────────────────────────── */
+  /* ── Galería ─────────────────────────────────── */
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [galleryModal, setGalleryModal] = useState(false);
@@ -60,35 +64,52 @@ export default function GestionWebPage() {
   const [gallerySaving, setGallerySaving] = useState(false);
   const [galleryForm] = Form.useForm();
 
-  /* ── Proyectos state ────────────────────────────────── */
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projLoading, setProjLoading] = useState(false);
+  /* ── Causas ─────────────────────────────────── */
+  const [causes, setCauses] = useState<Cause[]>([]);
+  const [causesLoading, setCausesLoading] = useState(false);
+  const [causesModal, setCausesModal] = useState(false);
+  const [causeEditing, setCauseEditing] = useState<Cause | null>(null);
+  const [causesSaving, setCausesSaving] = useState(false);
+  const [causesForm] = Form.useForm();
 
-  /* ── Deploy state ───────────────────────────────────── */
+  /* ── FAQ ─────────────────────────────────── */
+  const [faqs, setFaqs] = useState<FaqItem[]>([]);
+  const [faqLoading, setFaqLoading] = useState(false);
+  const [faqModal, setFaqModal] = useState(false);
+  const [faqEditing, setFaqEditing] = useState<FaqItem | null>(null);
+  const [faqSaving, setFaqSaving] = useState(false);
+  const [faqForm] = Form.useForm();
+
+  /* ── Aliados ─────────────────────────────────── */
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [partnersLoading, setPartnersLoading] = useState(false);
+  const [partnersModal, setPartnersModal] = useState(false);
+  const [partnerEditing, setPartnerEditing] = useState<Partner | null>(null);
+  const [partnersSaving, setPartnersSaving] = useState(false);
+  const [partnersForm] = Form.useForm();
+
+  /* ── Deploy ─────────────────────────────────── */
   const [deploying, setDeploying] = useState(false);
-  const [deployResult, setDeployResult] = useState<string | null>(null);
 
-  /* ── Loaders ─────────────────────────────────────────── */
+  /* ── Loaders ─────────────────────────────────── */
   const loadNews = useCallback(async () => {
     setNewsLoading(true);
     try {
-      const r = await fetch(`/api/gestion-web/noticias?limit=100&search=${newsSearch}`);
+      const r = await fetch('/api/gestion-web/noticias?limit=100');
       const d = await r.json();
       setNews(d.data ?? []);
     } catch { toast.error('Error cargando noticias'); }
     finally { setNewsLoading(false); }
-  }, [newsSearch]);
+  }, []);
 
   const loadContent = useCallback(async () => {
     setContentLoading(true);
     try {
       const r = await fetch('/api/gestion-web/contenido');
       const d = await r.json();
-      const blocks: WebContent[] = d.data ?? [];
-      setContent(blocks);
-      // Populate form
+      setContent(d.data ?? []);
       const vals: Record<string, string> = {};
-      blocks.forEach(b => { vals[`${b.section}__${b.key}`] = b.value; });
+      (d.data ?? []).forEach((c: WebContent) => { vals[`${c.section}__${c.key}`] = c.value; });
       contentForm.setFieldsValue(vals);
     } catch { toast.error('Error cargando contenido'); }
     finally { setContentLoading(false); }
@@ -104,45 +125,62 @@ export default function GestionWebPage() {
     finally { setGalleryLoading(false); }
   }, []);
 
-  const loadProjects = useCallback(async () => {
-    setProjLoading(true);
+  const loadCauses = useCallback(async () => {
+    setCausesLoading(true);
     try {
-      const r = await fetch('/api/proyectos?limit=50');
+      const r = await fetch('/api/gestion-web/causas?limit=100');
       const d = await r.json();
-      setProjects(d.data ?? []);
-    } catch { toast.error('Error cargando proyectos'); }
-    finally { setProjLoading(false); }
+      setCauses(d.data ?? []);
+    } catch { toast.error('Error cargando causas'); }
+    finally { setCausesLoading(false); }
+  }, []);
+
+  const loadFaq = useCallback(async () => {
+    setFaqLoading(true);
+    try {
+      const r = await fetch('/api/gestion-web/faq?limit=100');
+      const d = await r.json();
+      setFaqs(d.data ?? []);
+    } catch { toast.error('Error cargando FAQ'); }
+    finally { setFaqLoading(false); }
+  }, []);
+
+  const loadPartners = useCallback(async () => {
+    setPartnersLoading(true);
+    try {
+      const r = await fetch('/api/gestion-web/aliados?limit=100');
+      const d = await r.json();
+      setPartners(d.data ?? []);
+    } catch { toast.error('Error cargando aliados'); }
+    finally { setPartnersLoading(false); }
   }, []);
 
   useEffect(() => { if (tab === 'noticias') loadNews(); }, [tab, loadNews]);
   useEffect(() => { if (tab === 'contenido') loadContent(); }, [tab, loadContent]);
   useEffect(() => { if (tab === 'galeria') loadGallery(); }, [tab, loadGallery]);
-  useEffect(() => { if (tab === 'proyectos-web') loadProjects(); }, [tab, loadProjects]);
+  useEffect(() => { if (tab === 'causas') loadCauses(); }, [tab, loadCauses]);
+  useEffect(() => { if (tab === 'faq') loadFaq(); }, [tab, loadFaq]);
+  useEffect(() => { if (tab === 'aliados') loadPartners(); }, [tab, loadPartners]);
 
-  /* ── Noticias CRUD ───────────────────────────────────── */
-  function openNewsModal(record?: News) {
-    setNewsEditing(record ?? null);
+  /* ── News CRUD ─────────────────────────────────── */
+  function openNewsModal(item?: News) {
+    setNewsEditing(item ?? null);
     newsForm.resetFields();
-    if (record) newsForm.setFieldsValue(record);
-    else newsForm.setFieldsValue({ published: false });
+    if (item) newsForm.setFieldsValue({ ...item });
     setNewsModal(true);
   }
 
-  function onTitleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    if (!newsEditing) newsForm.setFieldValue('slug', slugify(e.target.value));
-  }
-
-  async function saveNews(values: Record<string, unknown>) {
+  async function saveNews(vals: Record<string, unknown>) {
     setNewsSaving(true);
     try {
-      const url    = newsEditing ? `/api/gestion-web/noticias/${newsEditing.id}` : '/api/gestion-web/noticias';
+      const url = newsEditing ? `/api/gestion-web/noticias/${newsEditing.id}` : '/api/gestion-web/noticias';
       const method = newsEditing ? 'PUT' : 'POST';
-      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error((await r.json()).error ?? 'Error');
       toast.success(newsEditing ? 'Noticia actualizada' : 'Noticia creada');
       setNewsModal(false);
       loadNews();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
     finally { setNewsSaving(false); }
   }
 
@@ -151,107 +189,166 @@ export default function GestionWebPage() {
       await fetch(`/api/gestion-web/noticias/${id}`, { method: 'DELETE' });
       toast.success('Noticia eliminada');
       loadNews();
-    } catch { toast.error('Error al eliminar'); }
+    } catch { toast.error('Error eliminando'); }
   }
 
-  async function toggleNewsPublish(record: News) {
-    try {
-      await fetch(`/api/gestion-web/noticias/${record.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...record, published: !record.published }),
-      });
-      toast.success(record.published ? 'Despublicada' : 'Publicada en el sitio');
-      loadNews();
-    } catch { toast.error('Error'); }
-  }
-
-  /* ── WebContent save ─────────────────────────────────── */
-  async function saveContent(values: Record<string, string>) {
+  /* ── Content CRUD ─────────────────────────────────── */
+  async function saveContent(vals: Record<string, string>) {
     setContentSaving(true);
     try {
-      const entries = Object.entries(values);
-      await Promise.all(entries.map(([fieldKey, value]) => {
-        const [section, key] = fieldKey.split('__');
-        return fetch('/api/gestion-web/contenido', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ section, key, value }),
-        });
-      }));
-      toast.success('Contenido del sitio actualizado');
+      const entries = Object.entries(vals).map(([key, value]) => {
+        const [section, ...rest] = key.split('__');
+        return { section, key: rest.join('__'), value: value ?? '' };
+      });
+      const r = await fetch('/api/gestion-web/contenido', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries }),
+      });
+      if (!r.ok) throw new Error('Error guardando');
+      toast.success('Contenido guardado');
     } catch { toast.error('Error guardando contenido'); }
     finally { setContentSaving(false); }
   }
 
-  /* ── Galería CRUD ────────────────────────────────────── */
-  function openGalleryModal(record?: GalleryItem) {
-    setGalleryEditing(record ?? null);
+  /* ── Gallery CRUD ─────────────────────────────────── */
+  function openGalleryModal(item?: GalleryItem) {
+    setGalleryEditing(item ?? null);
     galleryForm.resetFields();
-    if (record) galleryForm.setFieldsValue(record);
-    else galleryForm.setFieldsValue({ order: 0 });
+    if (item) galleryForm.setFieldsValue(item);
     setGalleryModal(true);
   }
 
-  async function saveGallery(values: Record<string, unknown>) {
+  async function saveGallery(vals: Record<string, unknown>) {
     setGallerySaving(true);
     try {
       const url    = galleryEditing ? `/api/gestion-web/galeria/${galleryEditing.id}` : '/api/gestion-web/galeria';
       const method = galleryEditing ? 'PUT' : 'POST';
-      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
-      if (!res.ok) throw new Error((await res.json()).error);
-      toast.success(galleryEditing ? 'Imagen actualizada' : 'Imagen agregada');
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error('Error');
+      toast.success(galleryEditing ? 'Foto actualizada' : 'Foto agregada');
       setGalleryModal(false);
       loadGallery();
-    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    } catch { toast.error('Error guardando'); }
     finally { setGallerySaving(false); }
   }
 
   async function deleteGallery(id: string) {
     try {
       await fetch(`/api/gestion-web/galeria/${id}`, { method: 'DELETE' });
-      toast.success('Imagen eliminada');
+      toast.success('Foto eliminada');
       loadGallery();
-    } catch { toast.error('Error al eliminar'); }
+    } catch { toast.error('Error eliminando'); }
   }
 
-  /* ── Deploy ──────────────────────────────────────────── */
+  /* ── Causes CRUD ─────────────────────────────────── */
+  function openCausesModal(item?: Cause) {
+    setCauseEditing(item ?? null);
+    causesForm.resetFields();
+    if (item) causesForm.setFieldsValue({ ...item, meta: Number(item.meta), recaudado: Number(item.recaudado) });
+    setCausesModal(true);
+  }
+
+  async function saveCause(vals: Record<string, unknown>) {
+    setCausesSaving(true);
+    try {
+      const url = causeEditing ? `/api/gestion-web/causas/${causeEditing.id}` : '/api/gestion-web/causas';
+      const method = causeEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error((await r.json()).error ?? 'Error');
+      toast.success(causeEditing ? 'Causa actualizada' : 'Causa creada');
+      setCausesModal(false);
+      loadCauses();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setCausesSaving(false); }
+  }
+
+  async function deleteCause(id: string) {
+    try {
+      await fetch(`/api/gestion-web/causas/${id}`, { method: 'DELETE' });
+      toast.success('Causa eliminada');
+      loadCauses();
+    } catch { toast.error('Error eliminando'); }
+  }
+
+  /* ── FAQ CRUD ─────────────────────────────────── */
+  function openFaqModal(item?: FaqItem) {
+    setFaqEditing(item ?? null);
+    faqForm.resetFields();
+    if (item) faqForm.setFieldsValue(item);
+    setFaqModal(true);
+  }
+
+  async function saveFaq(vals: Record<string, unknown>) {
+    setFaqSaving(true);
+    try {
+      const url = faqEditing ? `/api/gestion-web/faq/${faqEditing.id}` : '/api/gestion-web/faq';
+      const method = faqEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error('Error');
+      toast.success(faqEditing ? 'Pregunta actualizada' : 'Pregunta creada');
+      setFaqModal(false);
+      loadFaq();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setFaqSaving(false); }
+  }
+
+  async function deleteFaq(id: string) {
+    try {
+      await fetch(`/api/gestion-web/faq/${id}`, { method: 'DELETE' });
+      toast.success('Pregunta eliminada');
+      loadFaq();
+    } catch { toast.error('Error eliminando'); }
+  }
+
+  /* ── Partners CRUD ─────────────────────────────────── */
+  function openPartnersModal(item?: Partner) {
+    setPartnerEditing(item ?? null);
+    partnersForm.resetFields();
+    if (item) partnersForm.setFieldsValue(item);
+    setPartnersModal(true);
+  }
+
+  async function savePartner(vals: Record<string, unknown>) {
+    setPartnersSaving(true);
+    try {
+      const url = partnerEditing ? `/api/gestion-web/aliados/${partnerEditing.id}` : '/api/gestion-web/aliados';
+      const method = partnerEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error('Error');
+      toast.success(partnerEditing ? 'Aliado actualizado' : 'Aliado creado');
+      setPartnersModal(false);
+      loadPartners();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setPartnersSaving(false); }
+  }
+
+  async function deletePartner(id: string) {
+    try {
+      await fetch(`/api/gestion-web/aliados/${id}`, { method: 'DELETE' });
+      toast.success('Aliado eliminado');
+      loadPartners();
+    } catch { toast.error('Error eliminando'); }
+  }
+
+  /* ── Deploy ─────────────────────────────────── */
   async function triggerDeploy() {
     setDeploying(true);
-    setDeployResult(null);
     try {
-      const res = await fetch('/api/gestion-web/deploy', { method: 'POST' });
-      const d   = await res.json();
-      if (!res.ok) throw new Error(d.error);
-      setDeployResult('success');
-      toast.success('Redespliegue iniciado — el sitio se actualizará en ~2 minutos');
-    } catch (e: unknown) {
-      setDeployResult('error');
-      toast.error(e instanceof Error ? e.message : 'Error al desplegar');
-    }
+      const r = await fetch('/api/gestion-web/deploy', { method: 'POST' });
+      if (!r.ok) throw new Error('Error disparando deploy');
+      toast.success('¡Deploy iniciado! El sitio se actualizará en 1-2 minutos.');
+    } catch { toast.error('Error al publicar. Configura el webhook de Vercel.'); }
     finally { setDeploying(false); }
   }
 
-  /* ── Column definitions ──────────────────────────────── */
+  /* ── Table columns ─────────────────────────────────── */
   const newsCols: ColumnsType<News> = [
-    { title: 'Título', dataIndex: 'title', ellipsis: true,
-      render: (v: string, r: News) => (
-        <span>
-          {r.published ? <Tag color="success" style={{ marginRight: 6 }}>Publicada</Tag>
-                       : <Tag style={{ marginRight: 6 }}>Borrador</Tag>}
-          {v}
-        </span>
-      )},
-    { title: 'Slug', dataIndex: 'slug', ellipsis: true, width: 180,
-      render: (v: string) => <code style={{ fontSize: 11 }}>{v}</code> },
-    { title: 'Publicada', dataIndex: 'publishedAt', width: 110,
-      render: (v?: string) => v ? dayjs(v).format('DD/MM/YYYY') : '—' },
-    { title: '', width: 150, align: 'center',
-      render: (_: unknown, r: News) => (
+    { title: 'Título', dataIndex: 'title', key: 'title', ellipsis: true },
+    { title: 'Estado', key: 'published', render: (_, r) => r.published ? <Tag color="success">Publicado</Tag> : <Tag>Borrador</Tag>, width: 110 },
+    { title: 'Fecha', dataIndex: 'createdAt', key: 'createdAt', render: v => dayjs(v).format('DD/MM/YYYY'), width: 110 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
         <Space>
-          <Button size="small"
-            type={r.published ? 'default' : 'primary'}
-            onClick={() => toggleNewsPublish(r)}>
-            {r.published ? 'Despublicar' : 'Publicar'}
-          </Button>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openNewsModal(r)} />
           <Popconfirm title="¿Eliminar noticia?" onConfirm={() => deleteNews(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
@@ -261,21 +358,23 @@ export default function GestionWebPage() {
     },
   ];
 
-  const galleryCols: ColumnsType<GalleryItem> = [
-    { title: 'Vista previa', dataIndex: 'url', width: 80,
-      render: (v: string) => (
-        <img src={v} alt="" style={{ width: 60, height: 40, objectFit: 'cover', borderRadius: 4 }}
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-      )},
-    { title: 'Título', dataIndex: 'title', ellipsis: true, render: (v?: string) => v || '—' },
-    { title: 'Categoría', dataIndex: 'category', width: 120, render: (v?: string) => v ? <Tag>{v}</Tag> : '—' },
-    { title: 'Orden', dataIndex: 'order', width: 70, align: 'center' },
-    { title: '', width: 100, align: 'center',
-      render: (_: unknown, r: GalleryItem) => (
+  const causesCols: ColumnsType<Cause> = [
+    { title: 'Título', dataIndex: 'titulo', key: 'titulo', ellipsis: true },
+    { title: 'Tag', dataIndex: 'tag', key: 'tag', render: v => v ? <Tag color="green">{v}</Tag> : '-', width: 110 },
+    {
+      title: 'Progreso', key: 'pct', width: 160, render: (_, r) => {
+        const meta = Number(r.meta); const rec = Number(r.recaudado);
+        const pct = meta > 0 ? Math.round((rec / meta) * 100) : 0;
+        return <Progress percent={pct} size="small" strokeColor="#16a34a" />;
+      }
+    },
+    { title: 'Meta', dataIndex: 'meta', key: 'meta', render: v => `$${Number(v).toLocaleString()}`, width: 90 },
+    { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
         <Space>
-          <Button size="small" icon={<Eye size={13} />} onClick={() => window.open(r.url, '_blank')} />
-          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openGalleryModal(r)} />
-          <Popconfirm title="¿Eliminar imagen?" onConfirm={() => deleteGallery(r.id)} okText="Sí" cancelText="No">
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openCausesModal(r)} />
+          <Popconfirm title="¿Eliminar causa?" onConfirm={() => deleteCause(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
           </Popconfirm>
         </Space>
@@ -283,277 +382,362 @@ export default function GestionWebPage() {
     },
   ];
 
-  const projectCols: ColumnsType<Project> = [
-    { title: 'Proyecto', dataIndex: 'name', ellipsis: true },
-    { title: 'Estado', dataIndex: 'active', width: 120,
-      render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? 'Activo (en sitio)' : 'Inactivo'}</Tag> },
-    { title: 'Creado', dataIndex: 'createdAt', width: 110,
-      render: (v: string) => dayjs(v).format('DD/MM/YYYY') },
-    { title: '', width: 100, align: 'center',
-      render: () => (
-        <Button size="small" href="/proyectos" icon={<ArrowSquareOut size={13} />}>
-          Editar
-        </Button>
+  const galleryCols: ColumnsType<GalleryItem> = [
+    {
+      title: 'Imagen', key: 'img', width: 80, render: (_, r) => (
+        <img src={r.url} alt={r.title ?? ''} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 4 }} />
+      )
+    },
+    { title: 'Título', dataIndex: 'title', key: 'title', ellipsis: true },
+    { title: 'Categoría', dataIndex: 'category', key: 'category', width: 110 },
+    { title: 'Orden', dataIndex: 'order', key: 'order', width: 70 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openGalleryModal(r)} />
+          <Popconfirm title="¿Eliminar foto?" onConfirm={() => deleteGallery(r.id)} okText="Sí" cancelText="No">
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
 
-  /* ── Tab items ───────────────────────────────────────── */
+  const faqCols: ColumnsType<FaqItem> = [
+    { title: 'Pregunta', dataIndex: 'question', key: 'question', ellipsis: true },
+    { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
+    { title: 'Orden', dataIndex: 'order', key: 'order', width: 70 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openFaqModal(r)} />
+          <Popconfirm title="¿Eliminar pregunta?" onConfirm={() => deleteFaq(r.id)} okText="Sí" cancelText="No">
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const partnersCols: ColumnsType<Partner> = [
+    {
+      title: 'Logo', key: 'logo', width: 70, render: (_, r) => r.logo
+        ? <img src={r.logo} alt={r.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
+        : <span style={{ color: '#999', fontSize: 12 }}>Sin logo</span>
+    },
+    { title: 'Nombre', dataIndex: 'name', key: 'name' },
+    { title: 'URL', dataIndex: 'url', key: 'url', ellipsis: true, render: v => v ? <a href={v} target="_blank" rel="noopener noreferrer">{v}</a> : '-' },
+    { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openPartnersModal(r)} />
+          <Popconfirm title="¿Eliminar aliado?" onConfirm={() => deletePartner(r.id)} okText="Sí" cancelText="No">
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  /* ── Tabs ─────────────────────────────────── */
   const tabItems = [
     {
-      key: 'noticias', label: `Noticias (${news.length})`,
+      key: 'noticias', label: 'Noticias',
       children: (
-        <>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <Input placeholder="Buscar noticias..."
-              prefix={<MagnifyingGlass size={14} />}
-              value={newsSearch} onChange={e => setNewsSearch(e.target.value)}
-              style={{ width: 260 }} />
-            <Button type="primary" icon={<Plus size={14} />} onClick={() => openNewsModal()}>
-              Nueva noticia
-            </Button>
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <Input prefix={<MagnifyingGlass size={14} />} placeholder="Buscar noticia..." value={newsSearch}
+              onChange={e => setNewsSearch(e.target.value)} style={{ maxWidth: 300 }} allowClear />
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openNewsModal()}>Nueva noticia</Button>
           </div>
-          <Table dataSource={news} columns={newsCols} rowKey="id" loading={newsLoading}
-            size="small" pagination={{ pageSize: 15 }} />
-        </>
+          <Table dataSource={news.filter(n => n.title.toLowerCase().includes(newsSearch.toLowerCase()))}
+            columns={newsCols} rowKey="id" loading={newsLoading} size="small" pagination={{ pageSize: 10 }} />
+        </div>
       ),
     },
     {
-      key: 'contenido', label: 'Contenido del sitio',
-      children: contentLoading ? (
-        <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-      ) : (
-        <Form form={contentForm} layout="vertical" onFinish={saveContent} style={{ maxWidth: 700 }}>
+      key: 'causas', label: 'Causas / Proyectos',
+      children: (
+        <div>
           <Alert type="info" showIcon style={{ marginBottom: 16 }}
-            message="Edita los textos e indicadores que aparecen en el sitio web público. Los cambios se aplican al presionar 'Publicar sitio'." />
-
-          <Divider>Estadísticas de impacto (inicio)</Divider>
-          <Row gutter={12}>
-            <Col span={6}><Form.Item name="stats__anos" label="Valor: Años"><Input placeholder="+27" /></Form.Item></Col>
-            <Col span={6}><Form.Item name="stats__label_anos" label="Etiqueta"><Input placeholder="años de trabajo" /></Form.Item></Col>
-            <Col span={6}><Form.Item name="stats__comunidades" label="Valor: Comunidades"><Input placeholder="+50" /></Form.Item></Col>
-            <Col span={6}><Form.Item name="stats__label_comunidades" label="Etiqueta"><Input placeholder="comunidades atendidas" /></Form.Item></Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={6}><Form.Item name="stats__arboles" label="Valor: Árboles"><Input placeholder="+10K" /></Form.Item></Col>
-            <Col span={6}><Form.Item name="stats__label_arboles" label="Etiqueta"><Input placeholder="árboles plantados" /></Form.Item></Col>
-            <Col span={6}><Form.Item name="stats__donaciones" label="Valor: Donaciones"><Input placeholder="100%" /></Form.Item></Col>
-            <Col span={6}><Form.Item name="stats__label_donaciones" label="Etiqueta"><Input placeholder="sin fines de lucro" /></Form.Item></Col>
-          </Row>
-
-          <Divider>Textos del hero (inicio)</Divider>
-          <Form.Item name="hero__subtitulo" label="Badge / Subtítulo superior">
-            <Input placeholder="Desde 1997 · El Salvador" />
-          </Form.Item>
-          <Form.Item name="hero__titulo" label="Título principal">
-            <Input placeholder="Recuperando ecosistemas para la vida" />
-          </Form.Item>
-          <Form.Item name="hero__descripcion" label="Descripción">
-            <Input.TextArea rows={3} placeholder="Trabajamos con comunidades..." />
-          </Form.Item>
-
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={contentSaving}>
-              Guardar contenido
-            </Button>
-          </Form.Item>
-        </Form>
+            message="Las causas aparecen en la página principal del sitio web como tarjetas con barras de progreso de recaudación." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openCausesModal()}>Nueva causa</Button>
+          </div>
+          <Table dataSource={causes} columns={causesCols} rowKey="id" loading={causesLoading} size="small" pagination={false} />
+        </div>
       ),
     },
     {
       key: 'galeria', label: 'Galería de fotos',
       children: (
-        <>
-          <div style={{ marginBottom: 12 }}>
-            <Button type="primary" icon={<Plus size={14} />} onClick={() => openGalleryModal()}>
-              Agregar foto
-            </Button>
-          </div>
-          <Alert type="info" showIcon style={{ marginBottom: 12, maxWidth: 700 }}
-            message="Las fotos de la galería se muestran en la sección 'El campo, nuestra oficina' del sitio web. Usa URLs de Cloudinary o imágenes externas." />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 16, maxWidth: 800 }}>
-            {gallery.map(item => (
-              <div key={item.id} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: '#f0f0f0' }}>
-                <img src={item.url} alt={item.title || ''} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover' }}
-                  onError={e => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23ddd" width="100" height="100"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">IMG</text></svg>'; }} />
-                <div style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 2 }}>
-                  <Button size="small" icon={<PencilSimple size={10} />} onClick={() => openGalleryModal(item)} style={{ padding: '0 4px' }} />
-                  <Popconfirm title="¿Eliminar?" onConfirm={() => deleteGallery(item.id)} okText="Sí" cancelText="No">
-                    <Button size="small" danger icon={<Trash size={10} />} style={{ padding: '0 4px' }} />
-                  </Popconfirm>
-                </div>
-                {item.title && <div style={{ fontSize: 10, padding: '2px 4px', background: 'rgba(0,0,0,0.5)', color: '#fff', position: 'absolute', bottom: 0, width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{item.title}</div>}
-              </div>
-            ))}
-          </div>
-          {gallery.length === 0 && !galleryLoading && (
-            <Alert type="info" message="No hay fotos en la galería. Agrega la primera con el botón de arriba." />
-          )}
-        </>
-      ),
-    },
-    {
-      key: 'proyectos-web', label: 'Proyectos en el sitio',
-      children: (
-        <>
-          <Alert type="success" showIcon style={{ marginBottom: 16, maxWidth: 700 }}
-            message="Integración automática"
-            description="Los proyectos marcados como Activos en el módulo de Proyectos aparecen automáticamente en el sitio web. Para cambiar cuáles aparecen, activa/desactiva desde el módulo de Proyectos." />
-          <Table dataSource={projects} columns={projectCols} rowKey="id" loading={projLoading}
-            size="small" pagination={false} style={{ maxWidth: 700 }} />
-          <div style={{ marginTop: 12 }}>
-            <Button icon={<ArrowSquareOut size={14} />} href="/proyectos">
-              Ir al módulo de Proyectos
-            </Button>
-          </div>
-        </>
-      ),
-    },
-    {
-      key: 'publicar', label: 'Publicar sitio',
-      children: (
-        <div style={{ maxWidth: 600 }}>
+        <div>
           <Alert type="info" showIcon style={{ marginBottom: 16 }}
-            message="¿Cómo funciona?"
-            description="Cada vez que guardes noticias, edites contenido o cambies proyectos, debes presionar 'Publicar sitio' para que los cambios aparezcan en el sitio web público. Esto tarda aproximadamente 1-2 minutos." />
-
-          <Card size="small" style={{ borderRadius: 12, marginBottom: 16 }}>
-            <Row gutter={16} align="middle">
-              <Col flex="1">
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>Sitio web público</div>
-                <a href="https://asistedcos.org" target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 13, color: 'hsl(var(--brand-primary))' }}>
-                  https://asistedcos.org ↗
-                </a>
+            message="Las fotos de la galería aparecen en la sección de galería del sitio web." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openGalleryModal()}>Agregar foto</Button>
+          </div>
+          <Table dataSource={gallery} columns={galleryCols} rowKey="id" loading={galleryLoading} size="small" pagination={{ pageSize: 12 }} />
+        </div>
+      ),
+    },
+    {
+      key: 'faq', label: 'FAQ',
+      children: (
+        <div>
+          <Alert type="info" showIcon style={{ marginBottom: 16 }}
+            message="Las preguntas frecuentes aparecen en la sección FAQ del sitio web." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openFaqModal()}>Nueva pregunta</Button>
+          </div>
+          <Table dataSource={faqs} columns={faqCols} rowKey="id" loading={faqLoading} size="small" pagination={false} />
+        </div>
+      ),
+    },
+    {
+      key: 'aliados', label: 'Aliados',
+      children: (
+        <div>
+          <Alert type="info" showIcon style={{ marginBottom: 16 }}
+            message="Los aliados y patrocinadores aparecen en la sección de aliados del sitio web." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openPartnersModal()}>Nuevo aliado</Button>
+          </div>
+          <Table dataSource={partners} columns={partnersCols} rowKey="id" loading={partnersLoading} size="small" pagination={false} />
+        </div>
+      ),
+    },
+    {
+      key: 'contenido', label: 'Textos del sitio',
+      children: (
+        <Spin spinning={contentLoading}>
+          <Form form={contentForm} layout="vertical" onFinish={saveContent}>
+            <Divider>Textos del hero (inicio)</Divider>
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item name="hero__subtitulo" label="Badge superior (ej: Desde 1997 · El Salvador)">
+                  <Input />
+                </Form.Item>
               </Col>
-              <Col>
-                <Button type="primary" size="large" icon={<Rocket size={16} />}
-                  loading={deploying} onClick={triggerDeploy}
-                  style={{ height: 44, paddingInline: 24 }}>
-                  Publicar sitio ahora
-                </Button>
+              <Col span={24}>
+                <Form.Item name="hero__titulo" label="Título principal">
+                  <Input.TextArea rows={2} />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="hero__descripcion" label="Descripción del hero">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
               </Col>
             </Row>
-            {deployResult === 'success' && (
-              <Alert type="success" showIcon style={{ marginTop: 12 }}
-                message="Redespliegue iniciado. El sitio se actualizará en 1-2 minutos." />
-            )}
-            {deployResult === 'error' && (
-              <Alert type="warning" showIcon style={{ marginTop: 12 }}
-                message="No se pudo iniciar el redespliegue. Verifica que VERCEL_DEPLOY_HOOK_ONG esté configurado en las variables de entorno del servidor." />
-            )}
-          </Card>
-
-          <Divider>Configuración de Vercel</Divider>
-          <Alert type="warning" showIcon style={{ marginBottom: 12 }}
-            message="Para habilitar el botón 'Publicar sitio', agrega la variable de entorno:"
-            description={
-              <div>
-                <code style={{ display: 'block', marginTop: 8, padding: 8, background: '#fff8e6', borderRadius: 4 }}>
-                  VERCEL_DEPLOY_HOOK_ONG=https://api.vercel.com/v1/integrations/deploy/...
-                </code>
-                <p style={{ marginTop: 8, fontSize: 12 }}>
-                  Genera el hook desde: Vercel Dashboard → asistedcos_ong → Settings → Git → Deploy Hooks
-                </p>
-              </div>
-            } />
-          <Form layout="vertical" style={{ marginTop: 8 }}>
-            <Form.Item label="URL del sitio público">
-              <Input defaultValue="https://asistedcos.org" readOnly
-                addonAfter={
-                  <a href="https://asistedcos.org" target="_blank" rel="noopener noreferrer">
-                    <ArrowSquareOut size={14} />
-                  </a>
-                } />
-            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={contentSaving}>Guardar contenido</Button>
           </Form>
-        </div>
+        </Spin>
       ),
     },
   ];
 
+  /* ── Render ─────────────────────────────────── */
+  const addActionByTab: Record<string, { label: string; onClick: () => void } | undefined> = {
+    noticias: { label: 'Nueva noticia', onClick: () => openNewsModal() },
+  };
+
   return (
-    <div>
+    <>
       <PageHeader
+        icon={<Globe size={22} />}
         title="Gestión Web"
-        description="Administra el contenido del sitio público — noticias, estadísticas, galería y proyectos"
-        icon={<Globe size={20} />}
-        actions={tab === 'noticias' ? [{ label: 'Nueva noticia', onClick: () => openNewsModal() }] : []}
+        description="Administra el contenido del sitio público — noticias, causas, galería, FAQ y aliados"
+        actions={[
+          ...(addActionByTab[tab] ? [addActionByTab[tab]!] : []),
+          {
+            label: deploying ? 'Publicando...' : 'Publicar sitio',
+            onClick: triggerDeploy,
+          },
+        ]}
       />
 
-      <div style={{ background: 'hsl(var(--bg-surface))', border: '1px solid hsl(var(--border-default))', borderRadius: 12, padding: '12px 16px 16px' }}>
-        <Tabs activeKey={tab} onChange={setTab} items={tabItems} />
-      </div>
+      <Tabs activeKey={tab} onChange={setTab} items={tabItems} />
 
-      {/* ── Modal Noticia ─────────────────────────────────── */}
-      <Modal title={newsEditing ? 'Editar noticia' : 'Nueva noticia'}
-        open={newsModal} onCancel={() => setNewsModal(false)}
-        onOk={() => newsForm.submit()} okText={newsEditing ? 'Guardar' : 'Crear'}
-        confirmLoading={newsSaving} destroyOnClose width={740}
+      {/* News Modal */}
+      <Modal
+        title={newsEditing ? 'Editar noticia' : 'Nueva noticia'}
+        open={newsModal}
+        onCancel={() => setNewsModal(false)}
+        onOk={() => newsForm.submit()}
+        confirmLoading={newsSaving}
+        width={700}
+        okText={newsEditing ? 'Actualizar' : 'Crear'}
       >
-        <Form form={newsForm} layout="vertical" onFinish={saveNews} style={{ marginTop: 12 }}>
+        <Form form={newsForm} layout="vertical" onFinish={saveNews}>
           <Form.Item name="title" label="Título" rules={[{ required: true }]}>
-            <Input placeholder="Título de la noticia" onChange={onTitleChange} />
+            <Input onChange={e => { if (!newsEditing) newsForm.setFieldValue('slug', slugify(e.target.value)); }} />
           </Form.Item>
+          <Form.Item name="slug" label="Slug (URL)" rules={[{ required: true }]}>
+            <Input prefix="/" />
+          </Form.Item>
+          <Form.Item name="summary" label="Resumen">
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <Form.Item name="body" label="Contenido">
+            <Input.TextArea rows={6} />
+          </Form.Item>
+          <Form.Item name="coverImage" label="Imagen de portada">
+            <CloudinaryUpload folder="asistedcos/noticias" aspectHint="16:9 recomendado" />
+          </Form.Item>
+          <Form.Item name="published" label="Publicado" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Causes Modal */}
+      <Modal
+        title={causeEditing ? 'Editar causa' : 'Nueva causa'}
+        open={causesModal}
+        onCancel={() => setCausesModal(false)}
+        onOk={() => causesForm.submit()}
+        confirmLoading={causesSaving}
+        width={600}
+        okText={causeEditing ? 'Actualizar' : 'Crear'}
+      >
+        <Form form={causesForm} layout="vertical" onFinish={saveCause}>
           <Row gutter={12}>
             <Col span={16}>
-              <Form.Item name="slug" label="Slug (URL)" rules={[{ required: true }]}>
-                <Input placeholder="titulo-noticia" addonBefore="noticias/" />
+              <Form.Item name="titulo" label="Título" rules={[{ required: true }]}>
+                <Input />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="published" label="Publicar en el sitio" valuePropName="checked">
-                <Switch checkedChildren="Publicada" unCheckedChildren="Borrador" />
+              <Form.Item name="tag" label="Etiqueta (ej: Manglar)">
+                <Input />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="summary" label="Resumen (para listados y SEO)">
-            <Input.TextArea rows={2} maxLength={300} showCount />
+          <Form.Item name="descripcion" label="Descripción">
+            <Input.TextArea rows={3} />
           </Form.Item>
-          <Form.Item name="body" label="Contenido completo" rules={[{ required: true }]}>
-            <Input.TextArea rows={10} placeholder="Contenido completo de la noticia..." />
+          <Form.Item name="coverImage" label="Imagen">
+            <CloudinaryUpload folder="asistedcos/causas" aspectHint="4:3 recomendado" />
           </Form.Item>
-          <Form.Item name="coverImage" label="Imagen de portada">
-            <CloudinaryUpload
-              folder="asistedcos/noticias"
-              label="Subir imagen de portada"
-              aspectHint="Proporción 16:9 o 3:2 recomendada"
-            />
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="meta" label="Meta (USD)" rules={[{ required: true }]}>
+                <InputNumber min={0} step={1000} prefix="$" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="recaudado" label="Recaudado (USD)" rules={[{ required: true }]}>
+                <InputNumber min={0} step={100} prefix="$" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={4}>
+              <Form.Item name="order" label="Orden">
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={4}>
+              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Gallery Modal */}
+      <Modal
+        title={galleryEditing ? 'Editar foto' : 'Agregar foto'}
+        open={galleryModal}
+        onCancel={() => setGalleryModal(false)}
+        onOk={() => galleryForm.submit()}
+        confirmLoading={gallerySaving}
+        width={500}
+        okText={galleryEditing ? 'Actualizar' : 'Agregar'}
+      >
+        <Form form={galleryForm} layout="vertical" onFinish={saveGallery}>
+          <Form.Item name="url" label="Imagen" rules={[{ required: true }]}>
+            <CloudinaryUpload folder="asistedcos/galeria" />
+          </Form.Item>
+          <Form.Item name="title" label="Título (opcional)">
+            <Input />
+          </Form.Item>
+          <Form.Item name="category" label="Categoría (ej: Reforestación, Manglar)">
+            <Input />
+          </Form.Item>
+          <Form.Item name="order" label="Orden" initialValue={0}>
+            <InputNumber min={0} style={{ width: 100 }} />
           </Form.Item>
         </Form>
       </Modal>
 
-      {/* ── Modal Galería ─────────────────────────────────── */}
-      <Modal title={galleryEditing ? 'Editar foto' : 'Agregar foto'}
-        open={galleryModal} onCancel={() => setGalleryModal(false)}
-        onOk={() => galleryForm.submit()} okText={galleryEditing ? 'Guardar' : 'Agregar'}
-        confirmLoading={gallerySaving} destroyOnClose width={480}
+      {/* FAQ Modal */}
+      <Modal
+        title={faqEditing ? 'Editar pregunta' : 'Nueva pregunta'}
+        open={faqModal}
+        onCancel={() => setFaqModal(false)}
+        onOk={() => faqForm.submit()}
+        confirmLoading={faqSaving}
+        width={600}
+        okText={faqEditing ? 'Actualizar' : 'Crear'}
       >
-        <Form form={galleryForm} layout="vertical" onFinish={saveGallery} style={{ marginTop: 12 }}>
-          <Form.Item name="url" label="Foto" rules={[{ required: true, message: 'La imagen es requerida' }]}>
-            <CloudinaryUpload
-              folder="asistedcos/galeria"
-              label="Subir foto para la galería"
-              aspectHint="Proporción 1:1 o 4:3 recomendada"
-            />
+        <Form form={faqForm} layout="vertical" onFinish={saveFaq}>
+          <Form.Item name="question" label="Pregunta" rules={[{ required: true }]}>
+            <Input />
           </Form.Item>
-          <Form.Item name="title" label="Título / Descripción (alt text)">
-            <Input placeholder="Voluntarios plantando en La Libertad" />
+          <Form.Item name="answer" label="Respuesta" rules={[{ required: true }]}>
+            <Input.TextArea rows={4} />
           </Form.Item>
           <Row gutter={12}>
-            <Col span={14}>
-              <Form.Item name="category" label="Categoría">
-                <Input placeholder="Reforestación, Galería, Evento..." />
+            <Col span={8}>
+              <Form.Item name="order" label="Orden" initialValue={0}>
+                <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={10}>
-              <Form.Item name="order" label="Orden de aparición">
-                <InputNumber min={0} max={999} style={{ width: '100%' }} />
+            <Col span={8}>
+              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+                <Switch />
               </Form.Item>
             </Col>
           </Row>
         </Form>
       </Modal>
-    </div>
+
+      {/* Partners Modal */}
+      <Modal
+        title={partnerEditing ? 'Editar aliado' : 'Nuevo aliado'}
+        open={partnersModal}
+        onCancel={() => setPartnersModal(false)}
+        onOk={() => partnersForm.submit()}
+        confirmLoading={partnersSaving}
+        width={500}
+        okText={partnerEditing ? 'Actualizar' : 'Crear'}
+      >
+        <Form form={partnersForm} layout="vertical" onFinish={savePartner}>
+          <Form.Item name="name" label="Nombre del aliado" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="logo" label="Logo">
+            <CloudinaryUpload folder="asistedcos/aliados" aspectHint="Logo horizontal recomendado" />
+          </Form.Item>
+          <Form.Item name="url" label="Sitio web">
+            <Input placeholder="https://..." />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="order" label="Orden" initialValue={0}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+    </>
   );
 }

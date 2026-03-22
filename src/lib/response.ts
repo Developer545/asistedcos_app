@@ -21,6 +21,10 @@ export function ok<T>(data: T, status = 200): NextResponse {
 
 export function created<T>(data: T): NextResponse { return ok(data, 201); }
 
+export function noContent(): NextResponse {
+  return new NextResponse(null, { status: 204 });
+}
+
 export function apiError(err: unknown, status?: number): NextResponse {
   if (typeof err === 'string') {
     const body: ApiErrorBody = { success: false, error: { message: err, code: 'BAD_REQUEST' } };
