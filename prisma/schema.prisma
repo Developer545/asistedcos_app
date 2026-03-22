@@ -1,0 +1,707 @@
+// ASISTEDCOS Admin — Prisma Schema
+// DB: Neon PostgreSQL (pgBouncer pooled connection)
+// Roles: ADMIN | USER (single-instance, no multi-tenant)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ═══════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum DteType {
+  FACTURA         // 01
+  CCF             // 03
+  NOTA_CREDITO    // 05
+  NOTA_DEBITO     // 06
+  RETENCION       // 11
+  DONACION        // 46
+}
+
+enum DteStatus {
+  BORRADOR
+  EMITIDO
+  ANULADO
+}
+
+enum PaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  CHEQUE
+  TARJETA
+  OTRO
+}
+
+enum ExpenseStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  PAGADO
+}
+
+enum PurchaseStatus {
+  PENDIENTE
+  RECIBIDO
+  CANCELADO
+}
+
+enum MemberStatus {
+  ACTIVO
+  INACTIVO
+}
+
+enum VolunteerStatus {
+  ACTIVO
+  INACTIVO
+}
+
+enum BeneficiaryStatus {
+  ACTIVO
+  INACTIVO
+  EGRESADO
+}
+
+enum KardexType {
+  ENTRADA
+  SALIDA
+  AJUSTE
+}
+
+enum PayrollStatus {
+  BORRADOR
+  APROBADA
+  PAGADA
+}
+
+enum IvaBookType {
+  VENTAS
+  COMPRAS
+}
+
+// ═══════════════════════════════════════════════
+// USUARIOS
+// ═══════════════════════════════════════════════
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(USER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ═══════════════════════════════════════════════
+// CONFIGURACIÓN ORGANIZACIONAL
+// ═══════════════════════════════════════════════
+
+model OrgConfig {
+  id            String  @id @default(cuid())
+  key           String  @unique
+  value         String
+  description   String?
+
+  @@map("org_config")
+}
+
+// ═══════════════════════════════════════════════
+// DONANTES
+// ═══════════════════════════════════════════════
+
+model Donor {
+  id          String   @id @default(cuid())
+  name        String
+  nit         String?  @unique
+  dui         String?
+  email       String?
+  phone       String?
+  address     String?
+  isCompany   Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  donations   Donation[]
+
+  @@map("donors")
+}
+
+// ═══════════════════════════════════════════════
+// PROYECTOS
+// ═══════════════════════════════════════════════
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal  @default(0) @db.Decimal(12, 2)
+  active      Boolean  @default(true)
+  coverImage  String?  // Cloudinary URL
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  photos          ProjectPhoto[]
+  donations       Donation[]
+  impactMetrics   ImpactMetric[]
+  participations  VolunteerParticipation[]
+  expenses        Expense[]
+  inventoryItems  Product[]
+
+  @@map("projects")
+}
+
+model ProjectPhoto {
+  id        String   @id @default(cuid())
+  projectId String
+  url       String
+  caption   String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_photos")
+}
+
+model ImpactMetric {
+  id        String   @id @default(cuid())
+  projectId String
+  label     String
+  value     String
+  icon      String?
+  order     Int      @default(0)
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("impact_metrics")
+}
+
+// ═══════════════════════════════════════════════
+// DONACIONES
+// ═══════════════════════════════════════════════
+
+model Donation {
+  id            String        @id @default(cuid())
+  donorId       String
+  projectId     String?
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("USD")
+  date          DateTime      @default(now())
+  paymentMethod PaymentMethod @default(EFECTIVO)
+  notes         String?
+  receiptNumber String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  donor         Donor         @relation(fields: [donorId], references: [id])
+  project       Project?      @relation(fields: [projectId], references: [id])
+  certificate   DonationCert?
+
+  @@map("donations")
+}
+
+// ═══════════════════════════════════════════════
+// MIEMBROS (Junta Directiva y Staff)
+// ═══════════════════════════════════════════════
+
+model Member {
+  id          String       @id @default(cuid())
+  name        String
+  position    String       // Cargo: Presidenta, Secretaria, etc.
+  dui         String?
+  nit         String?
+  email       String?
+  phone       String?
+  photo       String?      // Cloudinary URL
+  status      MemberStatus @default(ACTIVO)
+  startDate   DateTime?
+  endDate     DateTime?
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("members")
+}
+
+// ═══════════════════════════════════════════════
+// VOLUNTARIOS
+// ═══════════════════════════════════════════════
+
+model Volunteer {
+  id            String          @id @default(cuid())
+  name          String
+  dui           String?
+  email         String?
+  phone         String?
+  skills        String?
+  status        VolunteerStatus @default(ACTIVO)
+  joinDate      DateTime        @default(now())
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  participations VolunteerParticipation[]
+
+  @@map("volunteers")
+}
+
+model VolunteerParticipation {
+  id          String    @id @default(cuid())
+  volunteerId String
+  projectId   String
+  date        DateTime
+  hours       Decimal   @db.Decimal(6, 2)
+  role        String?
+  notes       String?
+
+  volunteer   Volunteer @relation(fields: [volunteerId], references: [id])
+  project     Project   @relation(fields: [projectId], references: [id])
+
+  @@map("volunteer_participations")
+}
+
+// ═══════════════════════════════════════════════
+// BENEFICIARIOS
+// ═══════════════════════════════════════════════
+
+model Beneficiary {
+  id          String            @id @default(cuid())
+  name        String
+  dui         String?
+  birthDate   DateTime?
+  gender      String?
+  address     String?
+  phone       String?
+  status      BeneficiaryStatus @default(ACTIVO)
+  program     String?
+  entryDate   DateTime          @default(now())
+  exitDate    DateTime?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("beneficiaries")
+}
+
+// ═══════════════════════════════════════════════
+// GASTOS
+// ═══════════════════════════════════════════════
+
+model ExpenseCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+
+  expenses    Expense[]
+
+  @@map("expense_categories")
+}
+
+model Expense {
+  id          String        @id @default(cuid())
+  categoryId  String
+  projectId   String?
+  description String
+  amount      Decimal       @db.Decimal(12, 2)
+  date        DateTime      @default(now())
+  status      ExpenseStatus @default(PENDIENTE)
+  supplierId  String?
+  receiptUrl  String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  project     Project?        @relation(fields: [projectId], references: [id])
+  supplier    Supplier?       @relation(fields: [supplierId], references: [id])
+
+  @@map("expenses")
+}
+
+// ═══════════════════════════════════════════════
+// PROVEEDORES
+// ═══════════════════════════════════════════════
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  nrc         String?
+  nit         String?
+  dui         String?
+  email       String?
+  phone       String?
+  address     String?
+  contact     String?  // Nombre del contacto
+  active      Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  expenses    Expense[]
+  purchases   Purchase[]
+
+  @@map("suppliers")
+}
+
+// ═══════════════════════════════════════════════
+// COMPRAS
+// ═══════════════════════════════════════════════
+
+model Purchase {
+  id          String         @id @default(cuid())
+  supplierId  String
+  date        DateTime       @default(now())
+  status      PurchaseStatus @default(PENDIENTE)
+  subtotal    Decimal        @db.Decimal(12, 2)
+  iva         Decimal        @default(0) @db.Decimal(12, 2)
+  total       Decimal        @db.Decimal(12, 2)
+  notes       String?
+  invoiceRef  String?        // Referencia factura del proveedor
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  supplier    Supplier        @relation(fields: [supplierId], references: [id])
+  details     PurchaseDetail[]
+
+  @@map("purchases")
+}
+
+model PurchaseDetail {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  productId   String
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  total       Decimal  @db.Decimal(12, 2)
+
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@map("purchase_details")
+}
+
+// ═══════════════════════════════════════════════
+// INVENTARIO / PRODUCTOS
+// ═══════════════════════════════════════════════
+
+model Product {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  unit        String   @default("UNIDAD")
+  stock       Decimal  @default(0) @db.Decimal(10, 3)
+  minStock    Decimal  @default(0) @db.Decimal(10, 3)
+  projectId   String?  // Para insumos de proyecto específico
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project         Project?         @relation(fields: [projectId], references: [id])
+  purchaseDetails PurchaseDetail[]
+  kardex          Kardex[]
+
+  @@map("products")
+}
+
+model Kardex {
+  id          String     @id @default(cuid())
+  productId   String
+  type        KardexType
+  quantity    Decimal    @db.Decimal(10, 3)
+  balance     Decimal    @db.Decimal(10, 3)
+  reference   String?
+  notes       String?
+  date        DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  product     Product    @relation(fields: [productId], references: [id])
+
+  @@map("kardex")
+}
+
+// ═══════════════════════════════════════════════
+// PLANILLA
+// ═══════════════════════════════════════════════
+
+model PayrollConfig {
+  id        String  @id @default(cuid())
+  key       String  @unique
+  value     String
+  // Keys: ISSS_EMPLOYEE_RATE, ISSS_EMPLOYER_RATE,
+  //       AFP_EMPLOYEE_RATE, AFP_EMPLOYER_RATE,
+  //       SALARY_RENTA_TABLE (JSON)
+
+  @@map("payroll_config")
+}
+
+model Payroll {
+  id          String        @id @default(cuid())
+  month       Int           // 1-12
+  year        Int
+  status      PayrollStatus @default(BORRADOR)
+  totalGross  Decimal       @db.Decimal(12, 2)
+  totalNet    Decimal       @db.Decimal(12, 2)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  details     PayrollDetail[]
+
+  @@unique([month, year])
+  @@map("payrolls")
+}
+
+model PayrollDetail {
+  id              String  @id @default(cuid())
+  payrollId       String
+  employeeName    String
+  position        String
+  grossSalary     Decimal @db.Decimal(12, 2)
+  isssEmployee    Decimal @db.Decimal(12, 2)
+  afpEmployee     Decimal @db.Decimal(12, 2)
+  rentaRetention  Decimal @db.Decimal(12, 2)
+  otherDeductions Decimal @default(0) @db.Decimal(12, 2)
+  netSalary       Decimal @db.Decimal(12, 2)
+  isssEmployer    Decimal @db.Decimal(12, 2)
+  afpEmployer     Decimal @db.Decimal(12, 2)
+  totalCost       Decimal @db.Decimal(12, 2)
+
+  payroll         Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_details")
+}
+
+// ═══════════════════════════════════════════════
+// FACTURACIÓN DTE
+// ═══════════════════════════════════════════════
+
+model Correlativo {
+  id          String  @id @default(cuid())
+  dteType     DteType @unique
+  prefix      String  // Ej: "FAC", "CCF", "NCF"
+  current     Int     @default(0)
+  resolution  String? // Número de resolución MH
+
+  @@map("correlativos")
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  dteType         DteType
+  number          String        @unique // Número correlativo formateado
+  status          DteStatus     @default(BORRADOR)
+  date            DateTime      @default(now())
+
+  // Emisor (ONG)
+  issuerName      String
+  issuerNrc       String
+  issuerNit       String
+  issuerAddress   String
+
+  // Receptor
+  receiverName    String
+  receiverNrc     String?
+  receiverNit     String?
+  receiverDui     String?
+  receiverAddress String?
+
+  // Totales
+  subtotal        Decimal       @db.Decimal(12, 2)
+  ivaAmount       Decimal       @default(0) @db.Decimal(12, 2)
+  total           Decimal       @db.Decimal(12, 2)
+  paymentMethod   PaymentMethod @default(EFECTIVO)
+
+  notes           String?
+  voidReason      String?
+  relatedId       String?       // Para Notas de Crédito/Débito — referencia al DTE original
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  details         InvoiceDetail[]
+
+  @@map("invoices")
+}
+
+model InvoiceDetail {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal  @db.Decimal(10, 3)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  subtotal    Decimal  @db.Decimal(12, 2)
+  taxable     Boolean  @default(true)
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_details")
+}
+
+// ═══════════════════════════════════════════════
+// RETENCIONES (DTE Tipo 11)
+// ═══════════════════════════════════════════════
+
+model RetentionCert {
+  id              String    @id @default(cuid())
+  number          String    @unique
+  status          DteStatus @default(BORRADOR)
+  date            DateTime  @default(now())
+
+  // Agente retenedor (ONG)
+  agentName       String
+  agentNrc        String
+  agentNit        String
+
+  // Sujeto retenido
+  subjectName     String
+  subjectNit      String?
+  subjectDui      String?
+
+  serviceDesc     String    // Descripción del servicio
+  grossAmount     Decimal   @db.Decimal(12, 2)
+  retentionRate   Decimal   @db.Decimal(5, 4)  // Ej: 0.10 = 10%
+  retentionAmount Decimal   @db.Decimal(12, 2)
+  ivaRetained     Decimal   @default(0) @db.Decimal(12, 2)
+
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("retention_certs")
+}
+
+// ═══════════════════════════════════════════════
+// COMPROBANTE DE DONACIÓN (DTE Tipo 46)
+// ═══════════════════════════════════════════════
+
+model DonationCert {
+  id            String    @id @default(cuid())
+  donationId    String    @unique
+  number        String    @unique
+  status        DteStatus @default(BORRADOR)
+  date          DateTime  @default(now())
+
+  // ONG emisora
+  orgName       String
+  orgNrc        String
+  orgNit        String
+  orgAddress    String
+  authResolution String?  // Resolución de autorización DGII
+
+  // Donante
+  donorName     String
+  donorNit      String?
+  donorDui      String?
+
+  amount        Decimal   @db.Decimal(12, 2)
+  description   String    // Descripción de la donación
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  donation      Donation  @relation(fields: [donationId], references: [id])
+
+  @@map("donation_certs")
+}
+
+// ═══════════════════════════════════════════════
+// LIBROS IVA (F-07 / F-14)
+// ═══════════════════════════════════════════════
+
+model IvaBookEntry {
+  id              String      @id @default(cuid())
+  bookType        IvaBookType
+  month           Int
+  year            Int
+  date            DateTime
+  dteType         DteType?
+  invoiceNumber   String
+  supplierOrClient String
+  nrcOrNit        String?
+  totalSales      Decimal     @default(0) @db.Decimal(12, 2)
+  exemptSales     Decimal     @default(0) @db.Decimal(12, 2)
+  taxableSales    Decimal     @default(0) @db.Decimal(12, 2)
+  ivaCollected    Decimal     @default(0) @db.Decimal(12, 2)
+  totalPurchases  Decimal     @default(0) @db.Decimal(12, 2)
+  ivaCredited     Decimal     @default(0) @db.Decimal(12, 2)
+  createdAt       DateTime    @default(now())
+
+  @@index([bookType, year, month])
+  @@map("iva_book_entries")
+}
+
+// ═══════════════════════════════════════════════
+// ACTAS
+// ═══════════════════════════════════════════════
+
+model ActaRecord {
+  id          String   @id @default(cuid())
+  number      String   @unique
+  title       String
+  date        DateTime
+  attendees   String   // JSON o texto libre
+  agenda      String
+  agreements  String
+  fileUrl     String?  // PDF escaneado
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("acta_records")
+}
+
+// ═══════════════════════════════════════════════
+// GESTIÓN WEB (CMS para el sitio Astro)
+// ═══════════════════════════════════════════════
+
+model WebContent {
+  id          String   @id @default(cuid())
+  section     String   // 'hero', 'about', 'mission', 'contact', etc.
+  key         String
+  value       String
+  type        String   @default("text") // text | image | richtext
+  updatedAt   DateTime @updatedAt
+
+  @@unique([section, key])
+  @@map("web_content")
+}
+
+model WebNews {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  summary     String?
+  body        String
+  coverImage  String?
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("web_news")
+}
+
+model WebGallery {
+  id          String   @id @default(cuid())
+  title       String?
+  url         String   // Cloudinary URL
+  category    String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@map("web_gallery")
+}

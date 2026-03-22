@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════
+   ASISTEDCOS ADMIN — Sistema de Tokens de Color
+   ═══════════════════════════════════════════════════════════
+
+   ARQUITECTURA (3 capas):
+   CAPA 1 — Paleta cruda (raw palette) — HSL sin hsl()
+   CAPA 2 — Tokens semánticos — ÚNICOS que se usan en componentes
+   CAPA 3 — Overrides (futuro: modo oscuro, temas)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────
+   CAPA 1 — Paleta ONG Verde ASISTEDCOS
+   ───────────────────────────────────────────────────────── */
+:root {
+  /* Verde primario — extraído del logo ASISTEDCOS */
+  --palette-primary:        140 45% 32%;   /* #2d6b1a verde bosque */
+  --palette-primary-dark:   140 50% 22%;   /* verde oscuro */
+  --palette-primary-light:  140 45% 92%;   /* verde muy claro */
+
+  /* Neutros */
+  --palette-slate:          220 11% 40%;
+  --palette-slate-dark:     220 15% 26%;
+  --palette-slate-deeper:   220 20% 16%;   /* sidebar bg */
+
+  --palette-mauve:          240 6%  66%;
+  --palette-snow:           90  12% 94%;   /* fondo página — verde muy pálido */
+  --palette-steel:          140 20% 60%;   /* verde grisáceo — acento secundario */
+
+  --palette-white:          0 0% 100%;
+  --palette-off-white:      0 0% 98%;
+}
+
+/* ─────────────────────────────────────────────────────────
+   CAPA 2 — Tokens Semánticos
+   ───────────────────────────────────────────────────────── */
+:root {
+  /* Fondos */
+  --bg-page:            90 12% 94%;
+  --bg-surface:         0 0% 100%;
+  --bg-surface-raised:  0 0% 100%;
+  --bg-subtle:          90 8% 97%;
+  --bg-muted:           240 6% 90%;
+  --bg-inverse:         220 20% 16%;
+
+  /* Textos */
+  --text-primary:       220 11% 40%;
+  --text-secondary:     220 8%  52%;
+  --text-muted:         240 6%  66%;
+  --text-disabled:      240 6%  78%;
+  --text-inverse:       0 0% 100%;
+  --text-brand:         140 45% 32%;
+
+  /* Marca */
+  --brand-primary:       140 45% 32%;
+  --brand-primary-dark:  140 50% 22%;
+  --brand-primary-light: 140 45% 92%;
+  --brand-secondary:     140 20% 60%;
+  --brand-accent:        220 11% 40%;
+
+  /* Botones */
+  --btn-primary-bg:         140 45% 32%;
+  --btn-primary-bg-hover:   140 50% 22%;
+  --btn-primary-fg:         0 0% 100%;
+  --btn-secondary-bg:       90 8% 97%;
+  --btn-secondary-bg-hover: 240 6% 90%;
+  --btn-secondary-fg:       220 11% 40%;
+
+  /* Bordes */
+  --border-default:     240 8%  88%;
+  --border-strong:      240 6%  66%;
+  --border-brand:       140 45% 32%;
+  --border-focus:       140 45% 32%;
+
+  /* Inputs */
+  --input-bg:           0 0% 100%;
+  --input-bg-focus:     0 0% 100%;
+  --input-border:       240 8%  88%;
+  --input-border-focus: 140 45% 32%;
+  --input-text:         220 11% 40%;
+  --input-placeholder:  240 6%  66%;
+
+  /* Estados */
+  --status-success:    142 71% 35%;
+  --status-success-bg: 142 71% 94%;
+  --status-warning:    38  92% 44%;
+  --status-warning-bg: 38  92% 94%;
+  --status-error:      358 64% 46%;
+  --status-error-bg:   358 64% 94%;
+  --status-info:       140 45% 32%;
+  --status-info-bg:    140 45% 92%;
+
+  /* Sidebar */
+  --sidebar-bg:     220 20% 16%;
+  --sidebar-fg:     0 0% 92%;
+  --sidebar-muted:  240 6%  60%;
+  --sidebar-border: 220 12% 24%;
+
+  /* Sombras */
+  --shadow-color:   220 18% 18%;
+  --shadow-sm:      0 1px 3px hsl(var(--shadow-color) / 0.12), 0 1px 2px hsl(var(--shadow-color) / 0.08);
+  --shadow-md:      0 4px 12px hsl(var(--shadow-color) / 0.15), 0 2px 4px hsl(var(--shadow-color) / 0.08);
+  --shadow-lg:      0 10px 32px hsl(var(--shadow-color) / 0.18), 0 4px 8px hsl(var(--shadow-color) / 0.10);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Base
+   ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans, Inter, system-ui, sans-serif);
+  color: hsl(var(--text-primary));
+  background: hsl(var(--bg-page));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Sidebar
+   ───────────────────────────────────────────────────────── */
+.sidebar-nav-link:hover {
+  background: hsl(var(--brand-primary) / 0.08) !important;
+  color: hsl(var(--brand-primary)) !important;
+}
+
+.sidebar-toggle-btn:hover {
+  background: hsl(var(--sidebar-border)) !important;
+  color: hsl(var(--sidebar-fg)) !important;
+}
+
+.sidebar-logout-btn:hover {
+  background: hsl(var(--status-error-bg)) !important;
+  color: hsl(var(--status-error)) !important;
+  border-color: hsl(var(--status-error) / 0.3) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Sonner Toasts
+   ───────────────────────────────────────────────────────── */
+.ong-toast        { font-family: var(--font-sans) !important; }
+.ong-toast--success { border-color: hsl(var(--status-success) / 0.4) !important; }
+.ong-toast--error   { border-color: hsl(var(--status-error)   / 0.4) !important; }
+.ong-toast--warning { border-color: hsl(var(--status-warning) / 0.4) !important; }
+
+/* ─────────────────────────────────────────────────────────
+   Scrollbar personalizado (sidebar)
+   ───────────────────────────────────────────────────────── */
+.sidebar-scroll::-webkit-scrollbar       { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: hsl(var(--sidebar-border)); border-radius: 2px; }
