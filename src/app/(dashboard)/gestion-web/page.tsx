@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import PageHeader from '@/components/shared/PageHeader';
+import CloudinaryUpload from '@/components/shared/CloudinaryUpload';
 
 /* ─── Types ──────────────────────────────────────────── */
 type News = {
@@ -512,8 +513,12 @@ export default function GestionWebPage() {
           <Form.Item name="body" label="Contenido completo" rules={[{ required: true }]}>
             <Input.TextArea rows={10} placeholder="Contenido completo de la noticia..." />
           </Form.Item>
-          <Form.Item name="coverImage" label="URL de imagen de portada">
-            <Input placeholder="https://res.cloudinary.com/..." />
+          <Form.Item name="coverImage" label="Imagen de portada">
+            <CloudinaryUpload
+              folder="asistedcos/noticias"
+              label="Subir imagen de portada"
+              aspectHint="Proporción 16:9 o 3:2 recomendada"
+            />
           </Form.Item>
         </Form>
       </Modal>
@@ -525,8 +530,12 @@ export default function GestionWebPage() {
         confirmLoading={gallerySaving} destroyOnClose width={480}
       >
         <Form form={galleryForm} layout="vertical" onFinish={saveGallery} style={{ marginTop: 12 }}>
-          <Form.Item name="url" label="URL de la imagen" rules={[{ required: true, message: 'La URL es requerida' }]}>
-            <Input placeholder="https://res.cloudinary.com/..." />
+          <Form.Item name="url" label="Foto" rules={[{ required: true, message: 'La imagen es requerida' }]}>
+            <CloudinaryUpload
+              folder="asistedcos/galeria"
+              label="Subir foto para la galería"
+              aspectHint="Proporción 1:1 o 4:3 recomendada"
+            />
           </Form.Item>
           <Form.Item name="title" label="Título / Descripción (alt text)">
             <Input placeholder="Voluntarios plantando en La Libertad" />

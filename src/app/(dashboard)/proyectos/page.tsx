@@ -10,6 +10,7 @@ import { FolderOpen, PencilSimple, Trash } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import PageHeader from '@/components/shared/PageHeader';
+import CloudinaryUpload from '@/components/shared/CloudinaryUpload';
 
 type Project = {
   id: string; name: string; description?: string;
@@ -164,6 +165,13 @@ export default function ProyectosPage() {
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item name="coverImage" label="Imagen de portada (aparece en el sitio web)">
+            <CloudinaryUpload
+              folder="asistedcos/proyectos"
+              label="Subir foto del proyecto"
+              aspectHint="Proporción 16:9 recomendada"
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>
