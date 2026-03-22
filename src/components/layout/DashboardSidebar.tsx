@@ -107,7 +107,7 @@ export default function DashboardSidebar() {
   return (
     <aside style={{
       width:          sidebarW,
-      minHeight:      '100vh',
+      height:         '100vh',
       background:     'hsl(var(--sidebar-bg))',
       borderRight:    '1px solid hsl(var(--sidebar-border))',
       display:        'flex',
