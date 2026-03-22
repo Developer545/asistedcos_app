@@ -713,6 +713,8 @@ model WebCause {
   descripcion String?
   tag         String?  // e.g. "Manglar", "Reforestación", "Agua"
   coverImage  String?  // Cloudinary URL
+  ubicacion   String?  // e.g. "Playa San Diego, La Libertad"
+  estado      String   @default("Activo") // "Activo" | "Completado" | "Continuo"
   meta        Decimal  @default(0) @db.Decimal(12, 2)
   recaudado   Decimal  @default(0) @db.Decimal(12, 2)
   active      Boolean  @default(true)

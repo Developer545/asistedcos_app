@@ -18,10 +18,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await getCurrentUser();
     const { id } = await params;
     const body = await req.json();
-    const { titulo, descripcion, tag, coverImage, meta, recaudado, active, order } = body;
+    const { titulo, descripcion, tag, coverImage, ubicacion, estado, meta, recaudado, active, order } = body;
     const cause = await prisma.webCause.update({
       where: { id },
-      data: { titulo, descripcion, tag, coverImage, meta: meta ?? 0, recaudado: recaudado ?? 0, active, order },
+      data: { titulo, descripcion, tag, coverImage, ubicacion, estado: estado ?? 'Activo', meta: meta ?? 0, recaudado: recaudado ?? 0, active, order },
     });
     return ok(cause);
   } catch (e) { return apiError(e); }
