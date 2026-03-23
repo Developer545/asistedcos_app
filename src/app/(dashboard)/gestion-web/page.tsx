@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
   Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
-  InputNumber, Spin, Progress, Select,
+  InputNumber, Spin, Progress, Select, Image, Tooltip, Empty,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   Globe, PencilSimple, Trash, MagnifyingGlass, Plus, Eye,
+  Copy, ArrowClockwise, CloudArrowUp, Image as ImageIcon,
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -91,6 +92,12 @@ export default function GestionWebPage() {
   /* ── Deploy ─────────────────────────────────── */
   const [deploying, setDeploying] = useState(false);
 
+  /* ── Biblioteca ─────────────────────────────────── */
+  const [biblioteca, setBiblioteca] = useState<{ publicId: string; url: string; fullUrl: string; bytes: number; folder: string; createdAt: string }[]>([]);
+  const [bibLoading, setBibLoading] = useState(false);
+  const [bibFolder, setBibFolder] = useState('');
+  const [bibSearch, setBibSearch] = useState('');
+
   /* ── Loaders ─────────────────────────────────── */
   const loadNews = useCallback(async () => {
     setNewsLoading(true);
@@ -155,12 +162,23 @@ export default function GestionWebPage() {
     finally { setPartnersLoading(false); }
   }, []);
 
+  const loadBiblioteca = useCallback(async () => {
+    setBibLoading(true);
+    try {
+      const r = await fetch(`/api/cloudinary/media${bibFolder ? `?folder=${bibFolder}` : ''}`);
+      const d = await r.json();
+      setBiblioteca(d.data ?? []);
+    } catch { toast.error('Error cargando imágenes'); }
+    finally { setBibLoading(false); }
+  }, [bibFolder]);
+
   useEffect(() => { if (tab === 'noticias') loadNews(); }, [tab, loadNews]);
   useEffect(() => { if (tab === 'contenido') loadContent(); }, [tab, loadContent]);
   useEffect(() => { if (tab === 'galeria') loadGallery(); }, [tab, loadGallery]);
   useEffect(() => { if (tab === 'causas') loadCauses(); }, [tab, loadCauses]);
   useEffect(() => { if (tab === 'faq') loadFaq(); }, [tab, loadFaq]);
   useEffect(() => { if (tab === 'aliados') loadPartners(); }, [tab, loadPartners]);
+  useEffect(() => { if (tab === 'biblioteca') loadBiblioteca(); }, [tab, bibFolder, loadBiblioteca]);
 
   /* ── News CRUD ─────────────────────────────────── */
   function openNewsModal(item?: News) {
@@ -538,9 +556,107 @@ export default function GestionWebPage() {
                 </Form.Item>
               </Col>
             </Row>
+            <Divider>Imágenes del sitio</Divider>
+            <Form.Item name="hero__imagen" label="Imagen de fondo del hero (inicio)">
+              <CloudinaryUpload folder="asistedcos/hero" aspectHint="16:9 — 1920×1080 recomendado" />
+            </Form.Item>
+            <Form.Item name="about__imagen" label="Imagen de la sección Nosotros/Misión">
+              <CloudinaryUpload folder="asistedcos/about" aspectHint="4:3 — 800×600 recomendado" />
+            </Form.Item>
             <Button type="primary" htmlType="submit" loading={contentSaving}>Guardar contenido</Button>
           </Form>
         </Spin>
+      ),
+    },
+    {
+      key: 'biblioteca', label: 'Biblioteca de medios',
+      children: (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Select
+              value={bibFolder}
+              onChange={v => setBibFolder(v)}
+              style={{ minWidth: 220 }}
+              placeholder="Filtrar por carpeta"
+            >
+              <Select.Option value="">Todas las carpetas</Select.Option>
+              <Select.Option value="asistedcos/noticias">asistedcos/noticias</Select.Option>
+              <Select.Option value="asistedcos/causas">asistedcos/causas</Select.Option>
+              <Select.Option value="asistedcos/galeria">asistedcos/galeria</Select.Option>
+              <Select.Option value="asistedcos/hero">asistedcos/hero</Select.Option>
+              <Select.Option value="asistedcos/about">asistedcos/about</Select.Option>
+              <Select.Option value="asistedcos/aliados">asistedcos/aliados</Select.Option>
+              <Select.Option value="asistedcos/ong">asistedcos/ong</Select.Option>
+            </Select>
+            <Input
+              prefix={<MagnifyingGlass size={14} />}
+              placeholder="Buscar por ID..."
+              value={bibSearch}
+              onChange={e => setBibSearch(e.target.value)}
+              style={{ maxWidth: 240 }}
+              allowClear
+            />
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+              <CloudinaryUpload
+                folder={bibFolder || 'asistedcos/ong'}
+                label="Subir imagen"
+                onChange={() => loadBiblioteca()}
+              />
+              <Tooltip title="Refrescar">
+                <Button icon={<ArrowClockwise size={15} />} onClick={loadBiblioteca} loading={bibLoading} />
+              </Tooltip>
+            </div>
+          </div>
+          <Spin spinning={bibLoading}>
+            {biblioteca.filter(img => !bibSearch || img.publicId.toLowerCase().includes(bibSearch.toLowerCase())).length === 0 && !bibLoading
+              ? <Empty description="No hay imágenes en esta carpeta" />
+              : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                  {biblioteca
+                    .filter(img => !bibSearch || img.publicId.toLowerCase().includes(bibSearch.toLowerCase()))
+                    .map(img => (
+                      <Card
+                        key={img.publicId}
+                        size="small"
+                        bodyStyle={{ padding: 8 }}
+                        cover={
+                          <Image
+                            src={img.url}
+                            alt={img.publicId}
+                            style={{ height: 80, objectFit: 'cover', width: '100%' }}
+                            preview={{ src: img.fullUrl }}
+                          />
+                        }
+                      >
+                        <div style={{ fontSize: 11, color: '#666', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <Tooltip title={img.publicId}>
+                            <ImageIcon size={11} style={{ marginRight: 4 }} />
+                            {img.publicId.split('/').pop()}
+                          </Tooltip>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
+                          {(img.bytes / 1024).toFixed(1)} KB
+                        </div>
+                        <Tooltip title="Copiar URL completa">
+                          <Button
+                            size="small"
+                            icon={<Copy size={12} />}
+                            style={{ width: '100%' }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(img.fullUrl);
+                              toast.success('URL copiada');
+                            }}
+                          >
+                            Copiar URL
+                          </Button>
+                        </Tooltip>
+                      </Card>
+                    ))}
+                </div>
+              )
+            }
+          </Spin>
+        </div>
       ),
     },
   ];
