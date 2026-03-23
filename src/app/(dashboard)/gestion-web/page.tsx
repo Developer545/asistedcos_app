@@ -214,16 +214,21 @@ export default function GestionWebPage() {
   async function saveContent(vals: Record<string, string>) {
     setContentSaving(true);
     try {
-      const entries = Object.entries(vals).map(([key, value]) => {
-        const [section, ...rest] = key.split('__');
-        return { section, key: rest.join('__'), value: value ?? '' };
-      });
+      const IMAGE_KEYS = ['hero__imagen', 'about__imagen'];
+      const entries = Object.entries(vals)
+        .filter(([, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => {
+          const [section, ...rest] = key.split('__');
+          const fieldKey = rest.join('__');
+          const type = IMAGE_KEYS.includes(key) ? 'image' : 'text';
+          return { section, key: fieldKey, value: value ?? '', type };
+        });
       const r = await fetch('/api/gestion-web/contenido', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries }),
       });
       if (!r.ok) throw new Error('Error guardando');
-      toast.success('Contenido guardado');
+      toast.success('Contenido guardado correctamente');
     } catch { toast.error('Error guardando contenido'); }
     finally { setContentSaving(false); }
   }
