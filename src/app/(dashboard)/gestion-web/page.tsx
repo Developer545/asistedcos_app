@@ -16,6 +16,96 @@ import dayjs from 'dayjs';
 import PageHeader from '@/components/shared/PageHeader';
 import CloudinaryUpload from '@/components/shared/CloudinaryUpload';
 
+/* ─── GalleryGrid — simple photo wall ───────────────── */
+function GalleryGrid({
+  gallery,
+  loading,
+  onUpload,
+  onDelete,
+}: {
+  gallery: { id: string; url: string; title?: string }[];
+  loading: boolean;
+  onUpload: (url: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [uploadUrl, setUploadUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSelect(url: string) {
+    if (!url) return;
+    setSaving(true);
+    await onUpload(url);
+    setUploadUrl('');
+    setSaving(false);
+  }
+
+  return (
+    <Spin spinning={loading}>
+      <div style={{ marginBottom: 12, color: 'hsl(var(--text-muted))', fontSize: 13 }}>
+        {gallery.length} foto{gallery.length !== 1 ? 's' : ''} en la galería del sitio web.
+        Haz clic en <strong>+</strong> para agregar, o en <Trash size={12} style={{ display: 'inline' }} /> para eliminar.
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+        gap: 12,
+      }}>
+        {/* ── Add card ── */}
+        <div style={{
+          borderRadius: 10,
+          border: '2px dashed hsl(var(--border-default))',
+          minHeight: 160,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 12,
+          background: 'hsl(var(--bg-muted))',
+        }}>
+          <CloudinaryUpload
+            value={uploadUrl}
+            onChange={handleSelect}
+            folder="asistedcos/galeria"
+            label={saving ? 'Guardando...' : 'Agregar foto'}
+          />
+        </div>
+
+        {/* ── Photo cards ── */}
+        {gallery.map(item => (
+          <div
+            key={item.id}
+            style={{
+              borderRadius: 10,
+              overflow: 'hidden',
+              border: '1px solid hsl(var(--border-default))',
+              position: 'relative',
+              background: '#000',
+              minHeight: 160,
+            }}
+            className="gallery-card"
+          >
+            <Image
+              src={item.url}
+              alt={item.title ?? 'Foto galería'}
+              style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', opacity: 0.92 }}
+              preview={{ mask: <Eye size={18} /> }}
+            />
+            <Tooltip title="Eliminar foto">
+              <Button
+                size="small"
+                danger
+                icon={<Trash size={12} />}
+                onClick={() => onDelete(item.id)}
+                style={{ position: 'absolute', top: 6, right: 6, opacity: 0.85 }}
+              />
+            </Tooltip>
+          </div>
+        ))}
+      </div>
+    </Spin>
+  );
+}
+
 /* ─── Types ──────────────────────────────────────────── */
 type News = {
   id: string; title: string; slug: string; summary?: string;
@@ -502,14 +592,28 @@ export default function GestionWebPage() {
     {
       key: 'galeria', label: 'Galería de fotos',
       children: (
-        <div>
-          <Alert type="info" showIcon style={{ marginBottom: 16 }}
-            message="Las fotos de la galería aparecen en la sección de galería del sitio web." />
-          <div style={{ marginBottom: 16, textAlign: 'right' }}>
-            <Button type="primary" icon={<Plus size={14} />} onClick={() => openGalleryModal()}>Agregar foto</Button>
-          </div>
-          <Table dataSource={gallery} columns={galleryCols} rowKey="id" loading={galleryLoading} size="small" pagination={{ pageSize: 12 }} />
-        </div>
+        <GalleryGrid
+          gallery={gallery}
+          loading={galleryLoading}
+          onUpload={async (url) => {
+            try {
+              await fetch('/api/gestion-web/galeria', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, title: '', order: gallery.length }),
+              });
+              toast.success('Foto agregada a la galería');
+              loadGallery();
+            } catch { toast.error('Error agregando foto'); }
+          }}
+          onDelete={async (id) => {
+            try {
+              await fetch(`/api/gestion-web/galeria/${id}`, { method: 'DELETE' });
+              toast.success('Foto eliminada');
+              loadGallery();
+            } catch { toast.error('Error eliminando foto'); }
+          }}
+        />
       ),
     },
     {
