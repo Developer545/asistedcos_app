@@ -33,6 +33,7 @@ import {
   SignOut,
   CaretRight,
   Wallet,
+  Certificate,
 } from '@phosphor-icons/react';
 
 /* ─── Tipos ─────────────────────────────────────────────── */
@@ -49,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
 
   /* Gestión ONG */
   { href: '/donaciones',          label: 'Donaciones',      icon: <Heart size={18} weight="duotone" />,          section: 'Gestión ONG' },
+  { href: '/certificados',        label: 'Certificados',    icon: <Certificate size={18} weight="duotone" />,    section: 'Gestión ONG' },
   { href: '/proyectos',           label: 'Proyectos',       icon: <FolderOpen size={18} weight="duotone" />,     section: 'Gestión ONG' },
   { href: '/miembros',            label: 'Miembros',        icon: <Users size={18} weight="duotone" />,          section: 'Gestión ONG' },
   { href: '/voluntarios',         label: 'Voluntarios',     icon: <HandHeart size={18} weight="duotone" />,      section: 'Gestión ONG' },

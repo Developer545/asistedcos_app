@@ -6,9 +6,13 @@ import {
   DatePicker, Space, Tag, Popconfirm, Tabs, Statistic, Row, Col, Card,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { Heart, Plus, PencilSimple, Trash, MagnifyingGlass, Buildings, User } from '@phosphor-icons/react';
+import {
+  Heart, Plus, PencilSimple, Trash, MagnifyingGlass,
+  Buildings, User, Certificate, Eye,
+} from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
+import { useRouter } from 'next/navigation';
 import PageHeader from '@/components/shared/PageHeader';
 
 /* ─── Tipos ─────────────────────────────────────────── */
@@ -24,6 +28,7 @@ type Donation = {
   amount: number; date: string; paymentMethod: string; notes?: string;
   donor?: { id: string; name: string };
   project?: { id: string; name: string } | null;
+  certificate?: { id: string; number: string; status: string } | null;
 };
 
 type Project = { id: string; name: string };
@@ -44,6 +49,7 @@ function fmtUSD(n: number) {
 
 /* ─── Componente ─────────────────────────────────────── */
 export default function DonacionesPage() {
+  const router                      = useRouter();
   const [tab, setTab]               = useState('donaciones');
 
   /* Donaciones */
@@ -66,6 +72,9 @@ export default function DonacionesPage() {
   /* Proyectos (para select) */
   const [projects, setProjects]     = useState<Project[]>([]);
 
+  /* Certificados */
+  const [certLoading, setCertLoading] = useState<string | null>(null); // donationId en proceso
+
   /* Stats */
   const [stats, setStats]           = useState({ total: 0, count: 0, topDonor: '' });
 
@@ -73,7 +82,7 @@ export default function DonacionesPage() {
   const loadDonations = useCallback(async () => {
     setDLoading(true);
     try {
-      const r = await fetch('/api/donaciones?limit=100');
+      const r = await fetch('/api/donaciones?limit=100&include=certificate');
       const d = await r.json();
       setDonations(d.data ?? []);
       const list: Donation[] = d.data ?? [];
@@ -173,6 +182,25 @@ export default function DonacionesPage() {
     } catch { toast.error('Error al eliminar'); }
   }
 
+  /* ── Certificados ───────────────────────────────────── */
+  async function generateCert(donation: Donation) {
+    if (donation.certificate) {
+      router.push(`/certificados/${donation.certificate.id}`);
+      return;
+    }
+    setCertLoading(donation.id);
+    try {
+      const r = await fetch(`/api/donaciones/${donation.id}/certificado`, { method: 'POST' });
+      if (!r.ok) throw new Error((await r.json()).error);
+      const d = await r.json();
+      toast.success(`Certificado ${d.data.number} generado`);
+      loadDonations();
+      router.push(`/certificados/${d.data.id}`);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Error generando certificado');
+    } finally { setCertLoading(null); }
+  }
+
   /* ── Columnas ───────────────────────────────────────── */
   const donationCols: ColumnsType<Donation> = [
     { title: 'Fecha',   dataIndex: 'date', width: 110,
@@ -186,7 +214,39 @@ export default function DonacionesPage() {
       render: (v: number) => <b style={{ color: 'hsl(var(--status-success))' }}>{fmtUSD(Number(v))}</b>,
       sorter: (a, b) => Number(a.amount) - Number(b.amount) },
     {
-      title: '', width: 80, align: 'center',
+      title: 'Certificado', key: 'cert', width: 145, align: 'center',
+      render: (_: unknown, r: Donation) => {
+        if (r.certificate) {
+          const isAnulado = r.certificate.status === 'ANULADO';
+          return (
+            <Button
+              size="small"
+              type={isAnulado ? 'default' : 'primary'}
+              ghost={!isAnulado}
+              danger={isAnulado}
+              icon={<Eye size={12} />}
+              onClick={() => router.push(`/certificados/${r.certificate!.id}`)}
+              style={{ fontSize: 11 }}
+            >
+              {r.certificate.number}
+            </Button>
+          );
+        }
+        return (
+          <Button
+            size="small"
+            icon={<Certificate size={12} />}
+            loading={certLoading === r.id}
+            onClick={() => generateCert(r)}
+            style={{ fontSize: 11 }}
+          >
+            Generar
+          </Button>
+        );
+      },
+    },
+    {
+      title: '', width: 70, align: 'center',
       render: (_: unknown, r: Donation) => (
         <Space>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openDonation(r)} />

@@ -9,13 +9,14 @@ import type { ButtonProps } from 'antd';
 type Action = ButtonProps & { label: string };
 
 type Props = {
-  title:       string;
+  title:        string;
   description?: string;
-  actions?:    Action[];
-  icon?:       React.ReactNode;
+  actions?:     Action[];
+  icon?:        React.ReactNode;
+  extra?:       React.ReactNode;
 };
 
-export default function PageHeader({ title, description, actions, icon }: Props) {
+export default function PageHeader({ title, description, actions, icon, extra }: Props) {
   return (
     <div style={{
       display:        'flex',
@@ -53,9 +54,10 @@ export default function PageHeader({ title, description, actions, icon }: Props)
         </div>
       </div>
 
-      {actions && actions.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {actions.map(({ label, ...btnProps }, i) => (
+      {(actions?.length || extra) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {extra}
+          {actions?.map(({ label, ...btnProps }, i) => (
             <Button key={i} type={i === 0 ? 'primary' : 'default'} {...btnProps}>
               {label}
             </Button>

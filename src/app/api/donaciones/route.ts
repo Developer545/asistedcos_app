@@ -22,8 +22,9 @@ export async function GET(req: NextRequest) {
         skip,
         take: limit,
         include: {
-          donor:   { select: { id: true, name: true } },
-          project: { select: { id: true, name: true } },
+          donor:       { select: { id: true, name: true } },
+          project:     { select: { id: true, name: true } },
+          certificate: { select: { id: true, number: true, status: true } },
         },
       }),
       prisma.donation.count({ where }),
