@@ -29,19 +29,23 @@ export async function PUT(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await getCurrentUser();
-    const { entries } = await req.json();
-    if (!Array.isArray(entries)) return apiError('entries debe ser un array', 400);
-    const results = await Promise.all(
-      entries
-        .filter((e: { section: string; key: string }) => e.section && e.key)
-        .map(({ section, key, value, type }: { section: string; key: string; value?: string; type?: string }) =>
-          prisma.webContent.upsert({
-            where: { section_key: { section, key } },
-            update: { value: value ?? '', type: type ?? 'text' },
-            create: { section, key, value: value ?? '', type: type ?? 'text' },
-          })
-        )
-    );
+    const body = await req.json();
+    const entries = Array.isArray(body.entries) ? body.entries : [];
+
+    const results = [];
+    for (const entry of entries.slice(0, 50)) { // max 50 entries at once
+      const section = typeof entry.section === 'string' ? entry.section.slice(0, 50)   : '';
+      const key     = typeof entry.key     === 'string' ? entry.key.slice(0, 100)      : '';
+      const value   = typeof entry.value   === 'string' ? entry.value.slice(0, 5000)   : '';
+      const type    = ['text', 'image', 'richtext'].includes(entry.type) ? entry.type  : 'text';
+      if (!section || !key) continue;
+      const item = await prisma.webContent.upsert({
+        where: { section_key: { section, key } },
+        update: { value, type },
+        create: { section, key, value, type },
+      });
+      results.push(item);
+    }
     return ok(results);
   } catch (e) { return apiError(e); }
 }
