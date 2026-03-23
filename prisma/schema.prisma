@@ -748,3 +748,35 @@ model WebPartner {
 
   @@map("web_partners")
 }
+
+// ═══════════════════════════════════════════════
+// PRESUPUESTO
+// ═══════════════════════════════════════════════
+
+model Budget {
+  id          String   @id @default(cuid())
+  nombre      String   // "Presupuesto 2026"
+  anio        Int      // 2026
+  descripcion String?
+  estado      String   @default("Borrador") // Borrador | Aprobado | Cerrado
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lineas      BudgetLine[]
+
+  @@map("budgets")
+}
+
+model BudgetLine {
+  id          String   @id @default(cuid())
+  budgetId    String
+  tipo        String   // "ingreso" | "gasto"
+  categoria   String
+  descripcion String?
+  monto       Decimal  @default(0) @db.Decimal(12, 2)
+  orden       Int      @default(0)
+
+  budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@map("budget_lines")
+}

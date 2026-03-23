@@ -32,6 +32,7 @@ import {
   X,
   SignOut,
   CaretRight,
+  Wallet,
 } from '@phosphor-icons/react';
 
 /* ─── Tipos ─────────────────────────────────────────────── */
@@ -55,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
 
   /* Financiero */
   { href: '/gastos',              label: 'Gastos',          icon: <Receipt size={18} weight="duotone" />,        section: 'Financiero' },
+  { href: '/presupuesto',         label: 'Presupuesto',     icon: <Wallet size={18} weight="duotone" />,         section: 'Financiero' },
   { href: '/compras',             label: 'Compras',         icon: <ShoppingCart size={18} weight="duotone" />,   section: 'Financiero' },
   { href: '/inventario',          label: 'Inventario',      icon: <Package size={18} weight="duotone" />,        section: 'Financiero' },
   { href: '/proveedores',         label: 'Proveedores',     icon: <Truck size={18} weight="duotone" />,          section: 'Financiero' },
