@@ -126,7 +126,8 @@ model Donor {
   id          String   @id @default(cuid())
   name        String
   nit         String?  @unique
-  dui         String?
+  nrc         String?           // Número de Registro de Contribuyente (solo empresas)
+  dui         String?           // Documento Único de Identidad (solo personas naturales)
   email       String?
   phone       String?
   address     String?
@@ -606,7 +607,8 @@ model DonationCert {
   // Donante
   donorName     String
   donorNit      String?
-  donorDui      String?
+  donorNrc      String?  // Solo para empresas
+  donorDui      String?  // Solo para personas naturales
 
   amount        Decimal   @db.Decimal(12, 2)
   description   String    // Descripción de la donación

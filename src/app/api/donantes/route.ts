@@ -41,12 +41,12 @@ export async function POST(req: NextRequest) {
     if (!user) throw new UnauthorizedError();
 
     const body = await req.json();
-    const { name, nit, dui, email, phone, address, isCompany, notes } = body;
+    const { name, nit, nrc, dui, email, phone, address, isCompany, notes } = body;
 
     if (!name?.trim()) throw new ValidationError('El nombre es requerido');
 
     const donor = await prisma.donor.create({
-      data: { name: name.trim(), nit: nit || null, dui: dui || null,
+      data: { name: name.trim(), nit: nit || null, nrc: nrc || null, dui: dui || null,
               email: email || null, phone: phone || null,
               address: address || null, isCompany: !!isCompany, notes: notes || null },
     });

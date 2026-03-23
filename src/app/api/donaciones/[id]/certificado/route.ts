@@ -109,7 +109,8 @@ export async function POST(
 
         donorName: donation.donor.name,
         donorNit:  donation.donor.nit  || null,
-        donorDui:  donation.donor.dui  || null,
+        donorNrc:  donation.donor.isCompany ? (donation.donor.nrc || null) : null,
+        donorDui:  donation.donor.isCompany ? null : (donation.donor.dui || null),
 
         amount:      donation.amount,
         description,

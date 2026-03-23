@@ -25,6 +25,7 @@ type Cert = {
   authResolution: string | null;
   donorName:     string;
   donorNit:      string | null;
+  donorNrc:      string | null;
   donorDui:      string | null;
   amount:        number | string;
   description:   string;
@@ -261,7 +262,9 @@ export default function CertificadoPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                 <tbody>
                   <tr>
-                    <td style={{ width: '30%', color: '#555', paddingBottom: 4 }}>Nombre completo:</td>
+                    <td style={{ width: '35%', color: '#555', paddingBottom: 4 }}>
+                      {cert.donorNrc ? 'Razón social:' : 'Nombre completo:'}
+                    </td>
                     <td style={{ fontWeight: 700 }}>{cert.donorName}</td>
                   </tr>
                   {cert.donorNit && (
@@ -270,7 +273,13 @@ export default function CertificadoPage() {
                       <td>{cert.donorNit}</td>
                     </tr>
                   )}
-                  {cert.donorDui && (
+                  {cert.donorNrc && (
+                    <tr>
+                      <td style={{ color: '#555', paddingBottom: 4 }}>NRC:</td>
+                      <td>{cert.donorNrc}</td>
+                    </tr>
+                  )}
+                  {cert.donorDui && !cert.donorNrc && (
                     <tr>
                       <td style={{ color: '#555', paddingBottom: 4 }}>DUI:</td>
                       <td>{cert.donorDui}</td>

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select,
-  DatePicker, Space, Tag, Popconfirm, Tabs, Statistic, Row, Col, Card,
+  DatePicker, Space, Tag, Popconfirm, Tabs, Statistic, Row, Col, Card, Divider,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -17,7 +17,7 @@ import PageHeader from '@/components/shared/PageHeader';
 
 /* ─── Tipos ─────────────────────────────────────────── */
 type Donor = {
-  id: string; name: string; nit?: string; dui?: string;
+  id: string; name: string; nit?: string; nrc?: string; dui?: string;
   email?: string; phone?: string; address?: string;
   isCompany: boolean; notes?: string;
   _count?: { donations: number };
@@ -68,6 +68,7 @@ export default function DonacionesPage() {
   const [doForm]                    = Form.useForm();
   const [doSaving, setDoSaving]     = useState(false);
   const [doSearch, setDoSearch]     = useState('');
+  const doIsCompany = Form.useWatch('isCompany', doForm);
 
   /* Proyectos (para select) */
   const [projects, setProjects]     = useState<Project[]>([]);
@@ -266,7 +267,20 @@ export default function DonacionesPage() {
           {v}
         </Space>
       )},
-    { title: 'NIT',    dataIndex: 'nit',   width: 130, render: (v?: string) => v ?? '—' },
+    {
+      title: 'Identificación', width: 150,
+      render: (_: unknown, r: Donor) => r.isCompany
+        ? <div>
+            {r.nit && <div style={{ fontSize: 12 }}><b>NIT:</b> {r.nit}</div>}
+            {r.nrc && <div style={{ fontSize: 12 }}><b>NRC:</b> {r.nrc}</div>}
+            {!r.nit && !r.nrc && <span style={{ color: '#bbb' }}>—</span>}
+          </div>
+        : <div>
+            {r.dui && <div style={{ fontSize: 12 }}><b>DUI:</b> {r.dui}</div>}
+            {r.nit && <div style={{ fontSize: 12 }}><b>NIT:</b> {r.nit}</div>}
+            {!r.dui && !r.nit && <span style={{ color: '#bbb' }}>—</span>}
+          </div>,
+    },
     { title: 'Teléfono', dataIndex: 'phone', width: 120, render: (v?: string) => v ?? '—' },
     { title: 'Correo', dataIndex: 'email', ellipsis: true, render: (v?: string) => v ?? '—' },
     { title: 'Donaciones', width: 100, align: 'center',
@@ -416,27 +430,78 @@ export default function DonacionesPage() {
         width={600}
       >
         <Form form={doForm} layout="vertical" onFinish={saveDonor} style={{ marginTop: 12 }}>
+
+          {/* ── Tipo de donante ── */}
           <Row gutter={12}>
-            <Col span={16}>
-              <Form.Item name="name" label="Nombre completo / Razón social"
-                rules={[{ required: true, message: 'El nombre es requerido' }]}>
-                <Input placeholder="Nombre del donante" />
+            <Col span={14}>
+              <Form.Item name="name"
+                label={doIsCompany ? 'Razón social' : 'Nombre completo'}
+                rules={[{ required: true, message: 'El nombre es requerido' }]}
+              >
+                <Input placeholder={doIsCompany ? 'Nombre de la empresa' : 'Nombre y apellidos'} />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item name="isCompany" label="Tipo" initialValue={false}>
-                <Select options={[{ value: false, label: 'Persona natural' }, { value: true, label: 'Empresa' }]} />
+            <Col span={10}>
+              <Form.Item name="isCompany" label="Tipo de donante" initialValue={false}>
+                <Select
+                  options={[
+                    { value: false, label: '👤 Persona natural' },
+                    { value: true,  label: '🏢 Empresa / Institución' },
+                  ]}
+                />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="nit" label="NIT"><Input placeholder="0000-000000-000-0" /></Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="dui" label="DUI"><Input placeholder="00000000-0" /></Form.Item>
-            </Col>
-          </Row>
+
+          {/* ── Campos según tipo ── */}
+          {doIsCompany ? (
+            /* EMPRESA */
+            <>
+              <Divider plain style={{ fontSize: 12, color: '#888', margin: '4px 0 12px' }}>
+                Datos fiscales — Empresa
+              </Divider>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item name="nit" label="NIT (empresa)"
+                    tooltip="Número de Identificación Tributaria de la empresa">
+                    <Input placeholder="0000-000000-000-0" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="nrc" label="NRC"
+                    tooltip="Número de Registro de Contribuyente — requerido para empresas">
+                    <Input placeholder="000000-0" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          ) : (
+            /* PERSONA NATURAL */
+            <>
+              <Divider plain style={{ fontSize: 12, color: '#888', margin: '4px 0 12px' }}>
+                Datos de identidad — Persona natural
+              </Divider>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item name="dui" label="DUI"
+                    tooltip="Documento Único de Identidad">
+                    <Input placeholder="00000000-0" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="nit" label="NIT (opcional)"
+                    tooltip="Requerido si la persona tiene NIT para emisión de documentos fiscales">
+                    <Input placeholder="0000-000000-000-0" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
+
+          {/* ── Contacto (común) ── */}
+          <Divider plain style={{ fontSize: 12, color: '#888', margin: '4px 0 12px' }}>
+            Contacto
+          </Divider>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="email" label="Correo electrónico">
@@ -450,10 +515,10 @@ export default function DonacionesPage() {
             </Col>
           </Row>
           <Form.Item name="address" label="Dirección">
-            <Input placeholder="Dirección del donante" />
+            <Input placeholder="Departamento, municipio, dirección" />
           </Form.Item>
-          <Form.Item name="notes" label="Notas">
-            <Input.TextArea rows={2} />
+          <Form.Item name="notes" label="Notas internas">
+            <Input.TextArea rows={2} placeholder="Observaciones opcionales..." />
           </Form.Item>
         </Form>
       </Modal>
