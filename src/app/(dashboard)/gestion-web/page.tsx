@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
   Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
@@ -9,7 +9,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   Globe, PencilSimple, Trash, MagnifyingGlass, Plus, Eye,
-  Copy, ArrowClockwise, CloudArrowUp, Image as ImageIcon,
+  Copy, ArrowClockwise, CloudArrowUp, Image as ImageIcon, Images,
 } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -28,80 +28,158 @@ function GalleryGrid({
   onUpload: (url: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
-  const [uploadUrl, setUploadUrl] = useState('');
-  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerImages, setPickerImages] = useState<{ publicId: string; url: string; fullUrl: string; bytes: number }[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
 
-  async function handleSelect(url: string) {
-    if (!url) return;
-    setSaving(true);
-    await onUpload(url);
-    setUploadUrl('');
-    setSaving(false);
+  const CARD_H = 190;
+
+  async function handleFile(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error('Solo imágenes'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Máximo 10 MB'); return; }
+    setUploading(true); setUploadProgress(10);
+    try {
+      const signRes = await fetch('/api/cloudinary/sign', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: 'asistedcos/galeria' }),
+      });
+      if (!signRes.ok) throw new Error('Error de firma');
+      const { signature, timestamp, apiKey, cloudName } = await signRes.json();
+      setUploadProgress(35);
+      const fd = new FormData();
+      fd.append('file', file); fd.append('api_key', apiKey);
+      fd.append('timestamp', String(timestamp)); fd.append('signature', signature);
+      fd.append('folder', 'asistedcos/galeria');
+      const up = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: fd });
+      setUploadProgress(85);
+      if (!up.ok) throw new Error('Error subiendo');
+      const data = await up.json();
+      setUploadProgress(100);
+      const url = data.secure_url.replace('/upload/', '/upload/q_auto,f_auto/');
+      await onUpload(url);
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setUploading(false); setUploadProgress(0); if (inputRef.current) inputRef.current.value = ''; }
   }
+
+  async function openPicker() {
+    setPickerOpen(true); setPickerLoading(true); setPickerSearch('');
+    try {
+      const r = await fetch('/api/cloudinary/media');
+      const d = await r.json();
+      setPickerImages(d.data ?? []);
+    } catch { toast.error('Error cargando galería'); }
+    finally { setPickerLoading(false); }
+  }
+
+  const filtered = pickerSearch
+    ? pickerImages.filter(i => i.publicId.toLowerCase().includes(pickerSearch.toLowerCase()))
+    : pickerImages;
 
   return (
     <Spin spinning={loading}>
-      <div style={{ marginBottom: 12, color: 'hsl(var(--text-muted))', fontSize: 13 }}>
-        {gallery.length} foto{gallery.length !== 1 ? 's' : ''} en la galería del sitio web.
-        Haz clic en <strong>+</strong> para agregar, o en <Trash size={12} style={{ display: 'inline' }} /> para eliminar.
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ color: 'hsl(var(--text-muted))', fontSize: 13 }}>
+          <strong>{gallery.length}</strong> foto{gallery.length !== 1 ? 's' : ''} en la galería pública del sitio web
+        </span>
+        <Space>
+          <Button icon={<Images size={14} />} onClick={openPicker}>
+            Seleccionar de Cloudinary
+          </Button>
+          <Button type="primary" icon={<Plus size={14} />} onClick={() => inputRef.current?.click()} loading={uploading}>
+            Subir nueva foto
+          </Button>
+        </Space>
       </div>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-        gap: 12,
-      }}>
-        {/* ── Add card ── */}
-        <div style={{
-          borderRadius: 10,
-          border: '2px dashed hsl(var(--border-default))',
-          minHeight: 160,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 12,
-          background: 'hsl(var(--bg-muted))',
-        }}>
-          <CloudinaryUpload
-            value={uploadUrl}
-            onChange={handleSelect}
-            folder="asistedcos/galeria"
-            label={saving ? 'Guardando...' : 'Agregar foto'}
-          />
-        </div>
 
-        {/* ── Photo cards ── */}
-        {gallery.map(item => (
-          <div
-            key={item.id}
-            style={{
-              borderRadius: 10,
-              overflow: 'hidden',
-              border: '1px solid hsl(var(--border-default))',
-              position: 'relative',
-              background: '#000',
-              minHeight: 160,
-            }}
-            className="gallery-card"
-          >
-            <Image
-              src={item.url}
-              alt={item.title ?? 'Foto galería'}
-              style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', opacity: 0.92 }}
-              preview={{ mask: <Eye size={18} /> }}
-            />
-            <Tooltip title="Eliminar foto">
-              <Button
-                size="small"
-                danger
-                icon={<Trash size={12} />}
-                onClick={() => onDelete(item.id)}
-                style={{ position: 'absolute', top: 6, right: 6, opacity: 0.85 }}
-              />
-            </Tooltip>
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+
+      {/* Upload progress bar */}
+      {uploading && (
+        <Progress percent={uploadProgress} status="active" size="small" style={{ marginBottom: 12 }} />
+      )}
+
+      {/* Photo grid */}
+      {gallery.length === 0 && !uploading ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="No hay fotos en la galería. Sube tu primera foto."
+          style={{ padding: '40px 0' }}
+        />
+      ) : (
+        <Image.PreviewGroup>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+            gap: 10,
+          }}>
+            {gallery.map(item => (
+              <div key={item.id} style={{
+                position: 'relative',
+                borderRadius: 8,
+                overflow: 'hidden',
+                height: CARD_H,
+                background: 'hsl(var(--bg-muted))',
+                border: '1px solid hsl(var(--border-default))',
+              }}>
+                <Image
+                  src={item.url}
+                  alt={item.title ?? ''}
+                  style={{ width: '100%', height: CARD_H, objectFit: 'cover', display: 'block' }}
+                  preview={{ mask: <Eye size={16} /> }}
+                />
+                <Tooltip title="Eliminar foto">
+                  <Button
+                    size="small" danger icon={<Trash size={13} />}
+                    onClick={() => onDelete(item.id)}
+                    style={{ position: 'absolute', top: 6, right: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.35)' }}
+                  />
+                </Tooltip>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </Image.PreviewGroup>
+      )}
+
+      {/* Cloudinary picker modal */}
+      <Modal
+        title={<span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Images size={16} /> Seleccionar de Cloudinary</span>}
+        open={pickerOpen} onCancel={() => setPickerOpen(false)} footer={null} width={820}
+        styles={{ body: { maxHeight: '65vh', overflowY: 'auto' } }}
+      >
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <Input prefix={<MagnifyingGlass size={13} />} placeholder="Buscar imagen..."
+            value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} allowClear style={{ flex: 1 }} />
+          <Button icon={<ArrowClockwise size={13} />} onClick={openPicker} loading={pickerLoading} />
+        </div>
+        <Spin spinning={pickerLoading}>
+          {filtered.length === 0 && !pickerLoading
+            ? <Empty description="No hay imágenes disponibles" />
+            : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+                {filtered.map(img => (
+                  <div key={img.publicId}
+                    onClick={async () => { setPickerOpen(false); await onUpload(img.fullUrl); }}
+                    style={{ cursor: 'pointer', borderRadius: 8, overflow: 'hidden', border: '2px solid transparent',
+                      transition: 'border-color 0.15s, transform 0.15s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#16a34a'; (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.03)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = 'transparent'; (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)'; }}
+                  >
+                    <img src={img.url} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} loading="lazy" />
+                    <div style={{ padding: '4px 6px', fontSize: 10, color: 'hsl(var(--text-muted))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {Math.round(img.bytes / 1024)} KB
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+        </Spin>
+      </Modal>
     </Spin>
   );
 }
