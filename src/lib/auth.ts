@@ -52,6 +52,21 @@ export async function verifyAccessToken(token: string): Promise<JwtPayload | nul
   }
 }
 
+export async function verifyRefreshToken(token: string): Promise<{ sub: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    if (!payload.sub) return null;
+    return { sub: payload.sub as string };
+  } catch {
+    return null;
+  }
+}
+
+export async function getRefreshToken(): Promise<string | null> {
+  const store = await cookies();
+  return store.get('ong_refresh_token')?.value ?? null;
+}
+
 const COOKIE_BASE = {
   httpOnly: true,
   secure:   IS_PROD,
