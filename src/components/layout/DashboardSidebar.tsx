@@ -34,6 +34,10 @@ import {
   CaretRight,
   Wallet,
   Certificate,
+  BookOpen,
+  Notebook,
+  CalendarBlank,
+  TreeStructure,
 } from '@phosphor-icons/react';
 
 /* ─── Tipos ─────────────────────────────────────────────── */
@@ -69,6 +73,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/retenciones',         label: 'Retenciones',     icon: <FileMinus size={18} weight="duotone" />,      section: 'Fiscal' },
   { href: '/libros-iva',          label: 'Libros IVA',      icon: <Books size={18} weight="duotone" />,          section: 'Fiscal' },
 
+  /* Contabilidad */
+  { href: '/contabilidad',              label: 'Asientos',        icon: <Notebook size={18} weight="duotone" />,      section: 'Contabilidad' },
+  { href: '/contabilidad?tab=cuentas',  label: 'Catálogo Cuentas', icon: <TreeStructure size={18} weight="duotone" />,section: 'Contabilidad' },
+  { href: '/contabilidad?tab=periodos', label: 'Períodos',        icon: <CalendarBlank size={18} weight="duotone" />, section: 'Contabilidad' },
+  { href: '/contabilidad?tab=reportes', label: 'Reportes',        icon: <BookOpen size={18} weight="duotone" />,      section: 'Contabilidad' },
+
   /* Administración */
   { href: '/actas',               label: 'Actas',           icon: <FileText size={18} weight="duotone" />,       section: 'Administración' },
   { href: '/reportes',            label: 'Reportes',        icon: <ChartBar size={18} weight="duotone" />,       section: 'Administración' },
@@ -77,7 +87,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 /* Orden de secciones */
-const SECTION_ORDER = ['Gestión ONG', 'Financiero', 'Fiscal', 'Administración'];
+const SECTION_ORDER = ['Gestión ONG', 'Financiero', 'Fiscal', 'Contabilidad', 'Administración'];
 
 /* ─── Componente ─────────────────────────────────────────── */
 export default function DashboardSidebar() {
@@ -93,7 +103,9 @@ export default function DashboardSidebar() {
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(href);
+    // Para links con query params (ej: /contabilidad?tab=cuentas)
+    const [hrefPath] = href.split('?');
+    return pathname.startsWith(hrefPath) && pathname !== '/dashboard';
   };
 
   async function handleLogout() {

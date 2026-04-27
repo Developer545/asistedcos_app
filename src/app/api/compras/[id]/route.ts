@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ok, apiError } from '@/lib/response';
 import { getCurrentUser } from '@/lib/auth';
+import { asientoCompra } from '@/lib/contabilidad/auto-asientos';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -26,6 +27,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     await getCurrentUser();
     const { id } = await ctx.params;
     const { status, notes, invoiceRef } = await req.json();
+
+    const prev = await prisma.purchase.findUnique({ where: { id }, select: { status: true } });
 
     const purchase = await prisma.$transaction(async (tx) => {
       const p = await tx.purchase.update({
@@ -55,6 +58,11 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       }
       return p;
     });
+
+    // Auto-asiento al recibir
+    if (status === 'RECIBIDO' && prev?.status !== 'RECIBIDO') {
+      asientoCompra(id);
+    }
 
     return ok(purchase);
   } catch (e) { return apiError(e); }

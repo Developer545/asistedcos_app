@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ok, apiError } from '@/lib/response';
 import { getCurrentUser } from '@/lib/auth';
+import { asientoPlanilla } from '@/lib/contabilidad/auto-asientos';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,11 +24,20 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     await getCurrentUser();
     const { id } = await ctx.params;
     const { status } = await req.json();
+
+    const prev = await prisma.payroll.findUnique({ where: { id }, select: { status: true } });
+
     const payroll = await prisma.payroll.update({
       where: { id },
       data: { status },
       include: { details: true },
     });
+
+    // Auto-asiento de provisión de planilla al pagar
+    if (status === 'PAGADA' && prev?.status !== 'PAGADA') {
+      asientoPlanilla(id);
+    }
+
     return ok(payroll);
   } catch (e) { return apiError(e); }
 }

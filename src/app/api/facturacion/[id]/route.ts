@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ok, apiError } from '@/lib/response';
 import { getCurrentUser } from '@/lib/auth';
+import { asientoFactura } from '@/lib/contabilidad/auto-asientos';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,11 +24,21 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     await getCurrentUser();
     const { id } = await ctx.params;
     const { status, voidReason } = await req.json();
+
+    // Obtener estado anterior para detectar transición → EMITIDO
+    const prev = await prisma.invoice.findUnique({ where: { id }, select: { status: true } });
+
     const invoice = await prisma.invoice.update({
       where: { id },
       data:  { status, voidReason },
       include: { details: true },
     });
+
+    // Auto-asiento contable al emitir
+    if (status === 'EMITIDO' && prev?.status !== 'EMITIDO') {
+      asientoFactura(id); // fire-and-forget: no await para no bloquear
+    }
+
     return ok(invoice);
   } catch (e) { return apiError(e); }
 }

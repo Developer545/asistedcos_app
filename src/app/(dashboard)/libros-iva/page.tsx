@@ -50,22 +50,24 @@ export default function LibrosIvaPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/libros-iva?book=${tab}&month=${month}&year=${year}`);
-      const d = await r.json();
-      if (!d.data && !d.rows) throw new Error('Sin datos');
-      const result = d.data ?? d;
-      if (tab === 'VENTAS') {
-        setVentasRows(result.rows ?? []);
-        setVentasTotals(result.totals ?? null);
-      } else {
-        setComprasRows(result.rows ?? []);
-        setComprasTotals(result.totals ?? null);
-        setDebitoFiscal(result.debitoFiscal ?? 0);
-      }
-    } catch { toast.error('Error cargando libro'); }
+      // Siempre cargar ambos libros para poder calcular IVA neto correctamente
+      const [rv, rc] = await Promise.all([
+        fetch(`/api/libros-iva?book=VENTAS&month=${month}&year=${year}`),
+        fetch(`/api/libros-iva?book=COMPRAS&month=${month}&year=${year}`),
+      ]);
+      const [dv, dc] = await Promise.all([rv.json(), rc.json()]);
+      const ventas  = dv.data ?? dv;
+      const compras = dc.data ?? dc;
+      setVentasRows(ventas.rows ?? []);
+      setVentasTotals(ventas.totals ?? null);
+      setComprasRows(compras.rows ?? []);
+      setComprasTotals(compras.totals ?? null);
+      setDebitoFiscal(compras.debitoFiscal ?? 0);
+    } catch { toast.error('Error cargando libros IVA'); }
     finally { setLoading(false); }
-  }, [tab, month, year]);
+  }, [month, year]);
 
+  // Recargar cuando cambia mes/año; el tab solo filtra la vista
   useEffect(() => { load(); }, [load]);
 
   /* Exportar CSV simple */

@@ -752,6 +752,154 @@ model WebPartner {
 }
 
 // ═══════════════════════════════════════════════
+// CONTABILIDAD ONG
+// ═══════════════════════════════════════════════
+
+enum TipoCuenta {
+  ACTIVO
+  PASIVO
+  PATRIMONIO       // Patrimonio fundacional / fondos
+  INGRESO          // Ingresos por donaciones, cooperación
+  COSTO
+  GASTO            // Gastos de programa / administrativos
+  ORDEN_DEUDORA
+  ORDEN_ACREEDORA
+}
+
+enum NaturalezaCuenta {
+  DEUDORA          // Se debita para aumentar
+  ACREEDORA        // Se acredita para aumentar
+}
+
+enum EstadoAsiento {
+  BORRADOR
+  PUBLICADO
+  ANULADO
+}
+
+enum OrigenAsiento {
+  MANUAL
+  FACTURA_DTE      // Desde factura emitida
+  COMPRA           // Desde orden de compra
+  GASTO            // Desde gasto aprobado
+  PLANILLA         // Desde planilla cerrada
+  DONACION         // Desde donación recibida
+}
+
+enum EstadoPeriodo {
+  ABIERTO
+  CERRADO
+}
+
+// Catálogo de cuentas contables (Plan de Cuentas ONG)
+model AccountChart {
+  id                String           @id @default(cuid())
+  codigo            String           @unique
+  nombre            String
+  tipo              TipoCuenta
+  naturaleza        NaturalezaCuenta
+  nivel             Int              // 1=mayor, 2=grupo, 3=subgrupo, 4=analítica
+  parentId          String?
+  parent            AccountChart?    @relation("Hijos", fields: [parentId], references: [id])
+  hijos             AccountChart[]   @relation("Hijos")
+  permiteMovimiento Boolean          @default(true)  // false = solo agrupadora
+  descripcion       String?
+  activa            Boolean          @default(true)
+
+  lines             JournalLine[]
+  balances          AccountBalance[]
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@map("account_charts")
+}
+
+// Períodos contables (mes/año)
+model AccountingPeriod {
+  id          String        @id @default(cuid())
+  nombre      String        // "Enero 2026"
+  anio        Int
+  mes         Int           // 1-12
+  fechaInicio DateTime
+  fechaFin    DateTime
+  estado      EstadoPeriodo @default(ABIERTO)
+
+  entries     JournalEntry[]
+  balances    AccountBalance[]
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([anio, mes])
+  @@map("accounting_periods")
+}
+
+// Asientos contables
+model JournalEntry {
+  id          String         @id @default(cuid())
+  numero      Int
+  anio        Int
+  fecha       DateTime
+  concepto    String
+  tipo        String         @default("DIARIO") // DIARIO | AJUSTE | APERTURA | CIERRE
+  estado      EstadoAsiento  @default(BORRADOR)
+  origen      OrigenAsiento  @default(MANUAL)
+  origenId    String?        // ID del documento fuente (invoice, expense, etc.)
+
+  periodoId   String?
+  periodo     AccountingPeriod? @relation(fields: [periodoId], references: [id])
+
+  totalDebe   Decimal        @default(0) @db.Decimal(14, 2)
+  totalHaber  Decimal        @default(0) @db.Decimal(14, 2)
+
+  lines       JournalLine[]
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([anio, numero])
+  @@map("journal_entries")
+}
+
+// Líneas de asiento (partida doble)
+model JournalLine {
+  id          String       @id @default(cuid())
+  entryId     String
+  entry       JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     AccountChart @relation(fields: [accountId], references: [id])
+
+  descripcion String?
+  debe        Decimal      @default(0) @db.Decimal(14, 2)
+  haber       Decimal      @default(0) @db.Decimal(14, 2)
+  orden       Int          @default(0)
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+// Saldos por cuenta y período (desnormalizado para performance)
+model AccountBalance {
+  id            String           @id @default(cuid())
+  accountId     String
+  account       AccountChart     @relation(fields: [accountId], references: [id])
+  periodoId     String
+  periodo       AccountingPeriod @relation(fields: [periodoId], references: [id])
+
+  saldoAnterior Decimal          @default(0) @db.Decimal(14, 2)
+  debitos       Decimal          @default(0) @db.Decimal(14, 2)
+  creditos      Decimal          @default(0) @db.Decimal(14, 2)
+  saldoFinal    Decimal          @default(0) @db.Decimal(14, 2)
+
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([accountId, periodoId])
+  @@map("account_balances")
+}
+
+// ═══════════════════════════════════════════════
 // PRESUPUESTO
 // ═══════════════════════════════════════════════
 

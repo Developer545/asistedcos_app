@@ -3,7 +3,10 @@
  * Crea usuario ADMIN (Lic. Blanca Estela) y configuración base.
  */
 
-import { PrismaClient, DteType } from '@prisma/client';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
+import { PrismaClient, DteType, TipoCuenta, NaturalezaCuenta } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import bcrypt from 'bcryptjs';
@@ -152,7 +155,203 @@ async function main() {
   ]});
   console.log('✅ WebPartners creados');
 
+  /* ── Catálogo de Cuentas ONG El Salvador ─────────── */
+  await seedCatalogoCuentasONG();
+  console.log('✅ Catálogo de cuentas ONG creado');
+
   console.log('\n🎉 Seed completado exitosamente.');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CATÁLOGO DE CUENTAS ADAPTADO PARA ONG — El Salvador (NIIF PYMES)
+// Diferencias vs empresa comercial:
+//   - Patrimonio Fundacional en lugar de Capital Social
+//   - Fondos Restringidos / No Restringidos
+//   - Ingresos por Donaciones / Cooperación / Subvenciones
+//   - Gastos de Programa vs Gastos Administrativos (por función)
+// ═══════════════════════════════════════════════════════════════════
+
+type CuentaInput = {
+  codigo: string; nombre: string; tipo: TipoCuenta;
+  naturaleza: NaturalezaCuenta; nivel: number;
+  permiteMovimiento: boolean; descripcion?: string;
+};
+
+const CATALOGO_ONG: CuentaInput[] = [
+  // ─── 1. ACTIVO ───────────────────────────────────────────────────
+  { codigo:'1',        nombre:'ACTIVO',                                  tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:1, permiteMovimiento:false },
+  { codigo:'11',       nombre:'ACTIVO CORRIENTE',                        tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'1101',     nombre:'Efectivo y Equivalentes de Efectivo',     tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:false },
+  { codigo:'110101',   nombre:'Caja General',                            tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Efectivo en caja' },
+  { codigo:'110102',   nombre:'Caja Chica',                              tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Fondo fijo para gastos menores' },
+  { codigo:'110103',   nombre:'Banco — Cuenta Corriente Operacional',    tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'110104',   nombre:'Banco — Cuenta de Fondos Restringidos',   tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Cuenta exclusiva para fondos de cooperación' },
+  { codigo:'110105',   nombre:'Banco — Cuenta de Donaciones',            tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'1102',     nombre:'Cuentas por Cobrar',                      tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:false },
+  { codigo:'110201',   nombre:'CxC — Donaciones Prometidas',             tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Donaciones formalizadas pendientes de cobro' },
+  { codigo:'110202',   nombre:'CxC — Subvenciones por Cobrar',           tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Fondos de cooperación aprobados no desembolsados' },
+  { codigo:'110203',   nombre:'CxC — Servicios Prestados',               tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'1103',     nombre:'IVA Crédito Fiscal',                      tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:false },
+  { codigo:'110301',   nombre:'IVA Crédito Fiscal Compras',              tipo:'ACTIVO',     naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'IVA pagado en compras (crédito fiscal)' },
+  { codigo:'1104',     nombre:'Anticipos y Gastos Pagados por Anticipado',tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:false },
+  { codigo:'110401',   nombre:'Anticipos a Proveedores',                  tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'110402',   nombre:'Alquileres Pagados por Anticipado',        tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'110403',   nombre:'Seguros Pagados por Anticipado',           tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'1105',     nombre:'Inventario de Suministros',                tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:false },
+  { codigo:'110501',   nombre:'Suministros de Oficina',                   tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'110502',   nombre:'Materiales de Programas',                  tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Insumos para proyectos de impacto' },
+  { codigo:'12',       nombre:'ACTIVO NO CORRIENTE',                      tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'1201',     nombre:'Propiedad, Planta y Equipo',               tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:false },
+  { codigo:'120101',   nombre:'Mobiliario y Equipo de Oficina',           tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'120102',   nombre:'Equipo de Cómputo',                        tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'120103',   nombre:'Vehículos',                                tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true },
+  { codigo:'120104',   nombre:'Equipo de Campo / Herramientas',           tipo:'ACTIVO',    naturaleza:'DEUDORA',   nivel:4, permiteMovimiento:true,  descripcion:'Equipos para proyectos ambientales' },
+  { codigo:'1202',     nombre:'Depreciación Acumulada',                   tipo:'ACTIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'120201',   nombre:'Depreciación — Mobiliario y Equipo',       tipo:'ACTIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'120202',   nombre:'Depreciación — Equipo de Cómputo',         tipo:'ACTIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'120203',   nombre:'Depreciación — Vehículos',                 tipo:'ACTIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'120204',   nombre:'Depreciación — Equipo de Campo',           tipo:'ACTIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+
+  // ─── 2. PASIVO ───────────────────────────────────────────────────
+  { codigo:'2',        nombre:'PASIVO',                                   tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:1, permiteMovimiento:false },
+  { codigo:'21',       nombre:'PASIVO CORRIENTE',                         tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'2101',     nombre:'Cuentas por Pagar Comerciales',            tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'210101',   nombre:'Proveedores Nacionales',                   tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210102',   nombre:'Documentos por Pagar Corto Plazo',         tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'2102',     nombre:'Obligaciones con Empleados',               tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'210201',   nombre:'Sueldos por Pagar',                        tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210202',   nombre:'Vacaciones por Pagar',                     tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210203',   nombre:'Aguinaldo por Pagar',                      tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'2103',     nombre:'Retenciones y Cotizaciones por Pagar',     tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'210301',   nombre:'ISSS por Pagar — Empleado',                tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210302',   nombre:'ISSS por Pagar — Patronal',                tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210303',   nombre:'AFP por Pagar — Empleado',                 tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210304',   nombre:'AFP por Pagar — Patronal',                 tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210305',   nombre:'ISR (Renta) por Pagar',                    tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'210306',   nombre:'INSAFORP por Pagar',                       tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'2104',     nombre:'IVA Débito Fiscal',                        tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'210401',   nombre:'IVA Débito Fiscal por Pagar',              tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true,  descripcion:'IVA cobrado en ventas/servicios gravados' },
+  { codigo:'2105',     nombre:'Fondos de Cooperación Recibidos por Anticipado', tipo:'PASIVO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'210501',   nombre:'Fondos Internacionales No Ejecutados',     tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true,  descripcion:'Recursos de cooperantes pendientes de ejecución' },
+  { codigo:'210502',   nombre:'Donaciones Condicionadas No Devengadas',   tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+  { codigo:'2106',     nombre:'Retenciones a Terceros por Pagar',         tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'210601',   nombre:'Retención ISR Servicios por Pagar',        tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true,  descripcion:'Retenciones de renta aplicadas a proveedores' },
+  { codigo:'22',       nombre:'PASIVO NO CORRIENTE',                      tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'2201',     nombre:'Préstamos a Largo Plazo',                  tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:false },
+  { codigo:'220101',   nombre:'Préstamos Bancarios L/P',                  tipo:'PASIVO',    naturaleza:'ACREEDORA', nivel:4, permiteMovimiento:true },
+
+  // ─── 3. PATRIMONIO ───────────────────────────────────────────────
+  { codigo:'3',        nombre:'PATRIMONIO NETO',                          tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:1, permiteMovimiento:false, descripcion:'Patrimonio de la fundación sin fines de lucro' },
+  { codigo:'31',       nombre:'PATRIMONIO FUNDACIONAL',                   tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'3101',     nombre:'Patrimonio Fundacional Inicial',           tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Aporte inicial de los fundadores' },
+  { codigo:'32',       nombre:'FONDOS CON RESTRICCIONES PERMANENTES',     tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false, descripcion:'Fondos cuyo uso está restringido permanentemente por el donante' },
+  { codigo:'3201',     nombre:'Fondos para Proyectos Específicos',        tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'33',       nombre:'FONDOS CON RESTRICCIONES TEMPORALES',      tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false, descripcion:'Fondos con restricción que se libera al cumplir condición' },
+  { codigo:'3301',     nombre:'Fondos de Cooperación Internacional',      tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'3302',     nombre:'Fondos de Subvenciones Gubernamentales',   tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'34',       nombre:'FONDOS SIN RESTRICCIONES',                 tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'3401',     nombre:'Superávit / Déficit Ejercicios Anteriores',tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'3402',     nombre:'Superávit / Déficit del Ejercicio',        tipo:'PATRIMONIO', naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Resultado del período actual' },
+
+  // ─── 4. INGRESOS ─────────────────────────────────────────────────
+  { codigo:'4',        nombre:'INGRESOS',                                 tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:1, permiteMovimiento:false },
+  { codigo:'41',       nombre:'INGRESOS POR DONACIONES',                  tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false, descripcion:'Principal fuente de fondos de la ONG' },
+  { codigo:'4101',     nombre:'Donaciones Nacionales — Personas Naturales',tipo:'INGRESO',  naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Donaciones individuales de personas naturales SV' },
+  { codigo:'4102',     nombre:'Donaciones Nacionales — Empresas',         tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Donaciones corporativas nacionales (RSE)' },
+  { codigo:'4103',     nombre:'Donaciones Internacionales',               tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Fondos de organismos internacionales y ONG extranjeras' },
+  { codigo:'42',       nombre:'INGRESOS POR COOPERACIÓN Y SUBVENCIONES',  tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'4201',     nombre:'Subvenciones Gubernamentales',             tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Fondos de gobierno SV (MARN, FISDL, etc.)' },
+  { codigo:'4202',     nombre:'Cooperación Internacional (Convenios)',    tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true,  descripcion:'Fondos de agencias de cooperación (USAID, GIZ, UE, etc.)' },
+  { codigo:'43',       nombre:'INGRESOS POR SERVICIOS',                   tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'4301',     nombre:'Capacitaciones y Talleres',                tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'4302',     nombre:'Consultorías y Asistencia Técnica',        tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'44',       nombre:'OTROS INGRESOS',                           tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:2, permiteMovimiento:false },
+  { codigo:'4401',     nombre:'Ingresos Financieros (intereses)',         tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'4402',     nombre:'Ingresos por Venta de Activos',            tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+  { codigo:'4403',     nombre:'Otros Ingresos Varios',                    tipo:'INGRESO',   naturaleza:'ACREEDORA', nivel:3, permiteMovimiento:true },
+
+  // ─── 5. GASTOS DE PROGRAMA ───────────────────────────────────────
+  { codigo:'5',        nombre:'GASTOS DE PROGRAMA',                       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:1, permiteMovimiento:false, descripcion:'Gastos directamente relacionados con la misión de la ONG' },
+  { codigo:'51',       nombre:'PROGRAMA — CONSERVACIÓN AMBIENTAL',        tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'5101',     nombre:'Personal de Campo — Programa Ambiental',   tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5102',     nombre:'Materiales y Suministros — Reforestación', tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5103',     nombre:'Transporte y Logística — Proyectos',       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5104',     nombre:'Capacitación Comunitaria',                 tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5105',     nombre:'Equipos y Herramientas — Programas',       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'52',       nombre:'PROGRAMA — DESARROLLO COMUNITARIO',        tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'5201',     nombre:'Personal — Programa Comunitario',          tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5202',     nombre:'Materiales Educativos',                    tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5203',     nombre:'Atención a Beneficiarios',                 tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5204',     nombre:'Eventos y Actividades Comunitarias',       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'53',       nombre:'PROGRAMA — VOLUNTARIADO',                  tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'5301',     nombre:'Gastos Coordinación Voluntarios',          tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'5302',     nombre:'Uniformes y Materiales Voluntarios',       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+
+  // ─── 6. GASTOS ADMINISTRATIVOS ───────────────────────────────────
+  { codigo:'6',        nombre:'GASTOS ADMINISTRATIVOS Y GENERALES',       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:1, permiteMovimiento:false, descripcion:'Gastos de operación y administración de la fundación' },
+  { codigo:'61',       nombre:'GASTOS DE PERSONAL ADMINISTRATIVO',        tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'6101',     nombre:'Sueldos y Salarios — Administrativos',     tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6102',     nombre:'ISSS Patronal — Administrativos',          tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6103',     nombre:'AFP Patronal — Administrativos',           tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6104',     nombre:'INSAFORP',                                 tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6105',     nombre:'Vacaciones y Aguinaldo',                   tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'62',       nombre:'GASTOS GENERALES DE OPERACIÓN',            tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'6201',     nombre:'Alquiler de Instalaciones',                tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6202',     nombre:'Servicios Básicos (agua, luz, internet)',   tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6203',     nombre:'Comunicaciones y Telefonía',               tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6204',     nombre:'Suministros de Oficina',                   tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6205',     nombre:'Mantenimiento y Reparaciones',             tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6206',     nombre:'Depreciación de Activos',                  tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6207',     nombre:'Seguros',                                  tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'63',       nombre:'GASTOS DE CAPTACIÓN DE FONDOS',            tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false, descripcion:'Costos de recaudación y comunicación institucional' },
+  { codigo:'6301',     nombre:'Comunicación y Marketing Institucional',   tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6302',     nombre:'Eventos de Recaudación',                   tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6303',     nombre:'Honorarios Profesionales Externos',        tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'64',       nombre:'GASTOS FINANCIEROS',                       tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:2, permiteMovimiento:false },
+  { codigo:'6401',     nombre:'Comisiones Bancarias',                     tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+  { codigo:'6402',     nombre:'Intereses y Cargos Financieros',           tipo:'GASTO',     naturaleza:'DEUDORA',   nivel:3, permiteMovimiento:true },
+];
+
+async function seedCatalogoCuentasONG() {
+  // Limpiar catálogo existente para re-seed limpio
+  const existentes = await prisma.accountChart.count();
+  if (existentes > 0) {
+    console.log(`  ℹ Catálogo ya tiene ${existentes} cuentas — omitiendo re-seed`);
+    return;
+  }
+
+  // Crear todas las cuentas (primero las de nivel 1 y 2 sin parent)
+  const created = new Map<string, string>(); // codigo → id
+
+  // Ordenar por código para garantizar que los padres se crean primero
+  const sorted = [...CATALOGO_ONG].sort((a, b) => a.codigo.localeCompare(b.codigo));
+
+  for (const cuenta of sorted) {
+    // Determinar parentId buscando por prefijo del código
+    let parentId: string | null = null;
+    if (cuenta.nivel > 1) {
+      // El padre tiene el mismo código sin el último segmento
+      const codigoPadre = cuenta.codigo.slice(0, cuenta.nivel === 2 ? 1 : cuenta.nivel === 3 ? 2 : 4);
+      parentId = created.get(codigoPadre) ?? null;
+    }
+
+    const registro = await prisma.accountChart.create({
+      data: {
+        codigo:            cuenta.codigo,
+        nombre:            cuenta.nombre,
+        tipo:              cuenta.tipo,
+        naturaleza:        cuenta.naturaleza,
+        nivel:             cuenta.nivel,
+        permiteMovimiento: cuenta.permiteMovimiento,
+        descripcion:       cuenta.descripcion ?? null,
+        parentId,
+        activa:            true,
+      },
+    });
+    created.set(cuenta.codigo, registro.id);
+  }
+
+  console.log(`  ✅ ${sorted.length} cuentas creadas en el catálogo ONG`);
 }
 
 main()

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { created, apiError, paginate, parsePagination } from '@/lib/response';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
+import { asientoDonacion } from '@/lib/contabilidad/auto-asientos';
 
 export async function GET(req: NextRequest) {
   try {
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
         project: { select: { id: true, name: true } },
       },
     });
+
+    // Auto-asiento contable de la donación
+    asientoDonacion(donation.id);
 
     return created(donation);
   } catch (err) { return apiError(err); }
