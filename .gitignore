@@ -32,7 +32,10 @@ Thumbs.db
 # Vercel
 .vercel
 
-# Local config
+# Local config — no subir al repo
 CLAUDE.md
+AGENTS.md
+.claude/
+tsconfig.tsbuildinfo
 
 .vercel
