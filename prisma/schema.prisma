@@ -34,6 +34,13 @@ enum DteStatus {
   ANULADO
 }
 
+enum DteStatusMH {
+  PENDIENTE    // No enviado al MH (modo offline o en espera)
+  PROCESADO    // Aceptado y procesado por MH
+  CONTINGENCIA // Guardado localmente, pendiente de envío
+  RECHAZADO    // Rechazado por MH
+}
+
 enum PaymentMethod {
   EFECTIVO
   TRANSFERENCIA
@@ -531,6 +538,16 @@ model Invoice {
   notes           String?
   voidReason      String?
   relatedId       String?       // Para Notas de Crédito/Débito — referencia al DTE original
+
+  // ── Campos DTE Ministerio de Hacienda ─────────────────
+  codigoGeneracion  String?     // UUID generado al emitir
+  numeroControl     String?     // Formato DTE-XX-XXXXXXXXXX-XXXXXXXXXXXXXXX
+  selloRecibido     String?     // Código de recepción MH
+  fechaProcesamiento DateTime?  // Fecha/hora de procesamiento MH
+  estadoMH          DteStatusMH @default(PENDIENTE)
+  jsonDte           Json?       // JSON completo del DTE (firmado o sin firmar)
+  observacionesMH   String?     // Observaciones del MH en caso de error
+
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

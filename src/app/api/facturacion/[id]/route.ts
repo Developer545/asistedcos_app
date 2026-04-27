@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { ok, apiError } from '@/lib/response';
 import { getCurrentUser } from '@/lib/auth';
 import { asientoFactura } from '@/lib/contabilidad/auto-asientos';
+import { buildDteJson } from '@/lib/dte/builder';
+import { enviarDte } from '@/lib/dte/mh-api';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -25,8 +27,11 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     const { id } = await ctx.params;
     const { status, voidReason } = await req.json();
 
-    // Obtener estado anterior para detectar transición → EMITIDO
-    const prev = await prisma.invoice.findUnique({ where: { id }, select: { status: true } });
+    // Obtener estado anterior + datos necesarios para DTE
+    const prev = await prisma.invoice.findUnique({
+      where:   { id },
+      include: { details: true },
+    });
 
     const invoice = await prisma.invoice.update({
       where: { id },
@@ -34,9 +39,58 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       include: { details: true },
     });
 
-    // Auto-asiento contable al emitir
-    if (status === 'EMITIDO' && prev?.status !== 'EMITIDO') {
-      asientoFactura(id); // fire-and-forget: no await para no bloquear
+    // Al emitir: generar DTE JSON y enviar al MH (o guardar en contingencia)
+    if (status === 'EMITIDO' && prev?.status !== 'EMITIDO' && prev) {
+      // Obtener el correlativo actual para el numeroControl
+      const correlativo = await prisma.correlativo.findUnique({
+        where: { dteType: prev.dteType },
+        select: { current: true },
+      });
+      const secuencial = correlativo?.current ?? 1;
+
+      const dteJson = buildDteJson({
+        dteType:        prev.dteType,
+        secuencial,
+        fecha:          new Date(prev.date),
+        receiverName:   prev.receiverName,
+        receiverNrc:    prev.receiverNrc,
+        receiverNit:    prev.receiverNit,
+        receiverDui:    prev.receiverDui,
+        receiverAddress: prev.receiverAddress,
+        subtotal:       Number(prev.subtotal),
+        ivaAmount:      Number(prev.ivaAmount),
+        total:          Number(prev.total),
+        paymentMethod:  prev.paymentMethod,
+        details:        prev.details.map(d => ({
+          description: d.description,
+          quantity:    Number(d.quantity),
+          unitPrice:   Number(d.unitPrice),
+          subtotal:    Number(d.subtotal),
+          taxable:     d.taxable,
+        })),
+      });
+
+      // Enviar (o guardar en contingencia si está offline)
+      const resultado = await enviarDte(dteJson);
+
+      // Guardar resultado DTE en la factura
+      await prisma.invoice.update({
+        where: { id },
+        data: {
+          codigoGeneracion:  resultado.codigoGeneracion,
+          numeroControl:     dteJson.identificacion.numeroControl,
+          selloRecibido:     resultado.selloRecibido,
+          fechaProcesamiento: new Date(resultado.fechaProcesamiento),
+          estadoMH:          resultado.estado === 'PROCESADO' ? 'PROCESADO'
+                           : resultado.estado === 'RECHAZADO' ? 'RECHAZADO'
+                           : 'CONTINGENCIA',
+          jsonDte:           JSON.parse(resultado.jsonDte),
+          observacionesMH:   resultado.observaciones.join('; ') || null,
+        },
+      });
+
+      // Auto-asiento contable (fire-and-forget)
+      asientoFactura(id);
     }
 
     return ok(invoice);

@@ -4,10 +4,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select,
   Space, Tag, Popconfirm, DatePicker, Row, Col, Tabs,
-  Divider, Alert,
+  Divider, Alert, Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { FileText, Plus, X, Eye, Trash, Printer } from '@phosphor-icons/react';
+import { FileText, Plus, X, Eye, Trash, Printer, CloudArrowUp, FileDashed, SealCheck, Warning } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import PageHeader from '@/components/shared/PageHeader';
@@ -24,6 +24,12 @@ type Invoice = {
   subtotal: number; ivaAmount: number; total: number;
   paymentMethod: string; notes?: string; voidReason?: string;
   details: InvoiceDetail[];
+  // DTE Hacienda
+  codigoGeneracion?: string;
+  numeroControl?: string;
+  selloRecibido?: string;
+  estadoMH?: string;
+  observacionesMH?: string;
 };
 
 const DTE_LABELS: Record<string, string> = {
@@ -36,6 +42,19 @@ const DTE_LABELS: Record<string, string> = {
 
 const STATUS_COLOR: Record<string, string> = {
   BORRADOR: 'default', EMITIDO: 'success', ANULADO: 'error',
+};
+
+const MH_STATUS_COLOR: Record<string, string> = {
+  PENDIENTE:    'default',
+  PROCESADO:    'success',
+  CONTINGENCIA: 'warning',
+  RECHAZADO:    'error',
+};
+
+const MH_STATUS_ICON: Record<string, React.ReactNode> = {
+  PROCESADO:    <SealCheck size={13} color="#16a34a" />,
+  CONTINGENCIA: <Warning size={13} color="#d97706" />,
+  RECHAZADO:    <Warning size={13} color="#dc2626" />,
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -137,6 +156,22 @@ export default function FacturacionPage() {
     }
   }
 
+  async function enviarMH(id: string) {
+    try {
+      const res = await fetch(`/api/facturacion/${id}/enviar-mh`, { method: 'POST' });
+      const d   = await res.json();
+      if (!res.ok) throw new Error(d.error ?? 'Error');
+      toast.success(`DTE enviado al MH — Estado: ${d.data?.estado}`);
+      load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Error al enviar al MH');
+    }
+  }
+
+  function descargarJson(id: string) {
+    window.open(`/api/facturacion/${id}/json`, '_blank');
+  }
+
   const columns: ColumnsType<Invoice> = [
     { title: 'Número', dataIndex: 'number', width: 140,
       render: (v: string) => <Tag color="blue">{v}</Tag> },
@@ -155,17 +190,32 @@ export default function FacturacionPage() {
     }] : []),
     { title: 'Total', dataIndex: 'total', width: 110, align: 'right',
       render: (v: number) => <b>{fmtUSD(Number(v))}</b> },
-    { title: 'Estado', dataIndex: 'status', width: 100,
+    { title: 'Estado Doc.', dataIndex: 'status', width: 100,
       render: (v: string) => <Tag color={STATUS_COLOR[v]}>{v}</Tag> },
+    { title: 'Estado MH', dataIndex: 'estadoMH', width: 120,
+      render: (v: string) => v && v !== 'PENDIENTE'
+        ? <Tag color={MH_STATUS_COLOR[v]} icon={MH_STATUS_ICON[v]}>{v}</Tag>
+        : <Tag color="default">—</Tag>
+    },
     {
-      title: '', width: 100, align: 'center',
+      title: '', width: 140, align: 'center',
       render: (_: unknown, r: Invoice) => (
-        <Space>
-          <Button size="small" icon={<Eye size={13} />} onClick={() => setView(r)} />
+        <Space size={3}>
+          <Tooltip title="Ver documento"><Button size="small" icon={<Eye size={13} />} onClick={() => setView(r)} /></Tooltip>
           {r.status === 'BORRADOR' && (
             <Button size="small" type="primary" onClick={() => changeStatus(r.id, 'EMITIDO')}>
               Emitir
             </Button>
+          )}
+          {r.status === 'EMITIDO' && r.estadoMH === 'CONTINGENCIA' && (
+            <Tooltip title="Enviar al Ministerio de Hacienda">
+              <Button size="small" icon={<CloudArrowUp size={13} />} onClick={() => enviarMH(r.id)} />
+            </Tooltip>
+          )}
+          {r.status === 'EMITIDO' && r.estadoMH && r.estadoMH !== 'PENDIENTE' && (
+            <Tooltip title="Descargar JSON DTE">
+              <Button size="small" icon={<FileDashed size={13} />} onClick={() => descargarJson(r.id)} />
+            </Tooltip>
           )}
           {r.status !== 'ANULADO' && (
             <Popconfirm title="¿Eliminar documento?" onConfirm={() => onDelete(r.id)} okText="Sí" cancelText="No"
@@ -204,6 +254,11 @@ export default function FacturacionPage() {
         actions={[{ label: `Nuevo ${DTE_LABELS[tab]?.split(' ')[0]}`, onClick: openNew }]}
       />
 
+      <Alert
+        type="info" showIcon style={{ marginBottom: 12 }}
+        message={<span><b>Modo DTE:</b> Los documentos se emiten localmente (modo sin conexión). Para conectar al Ministerio de Hacienda, configure <code>DTE_MODE=test</code> y las credenciales en <code>.env.local</code>.</span>}
+      />
+
       <div style={{ background: 'hsl(var(--bg-surface))', border: '1px solid hsl(var(--border-default))', borderRadius: 12, padding: '12px 16px 16px' }}>
         <Tabs activeKey={tab} onChange={setTab} items={tabItems} />
       </div>
@@ -217,6 +272,11 @@ export default function FacturacionPage() {
         {needsIva && (
           <Alert type="info" showIcon style={{ marginBottom: 12 }}
             message="CCF: aplica IVA 13% sobre los ítems gravados. Asegúrate de ingresar el NRC del receptor." />
+        )}
+        {tab === 'DONACION' && (
+          <Alert type="success" showIcon style={{ marginBottom: 12 }}
+            message="Comprobante de Donación (Tipo 15)"
+            description="Emitido por la ONG al donante. Exento de IVA. El donante puede deducir hasta el 50% en ISR (Ley 894). No requiere NRC." />
         )}
         <Form form={form} layout="vertical" onFinish={onSave} style={{ marginTop: 8 }}>
           <Form.Item name="dteType" hidden initialValue={tab}><Input /></Form.Item>
@@ -385,6 +445,35 @@ export default function FacturacionPage() {
             {viewDoc.voidReason && (
               <Alert type="error" style={{ marginTop: 8 }}
                 message={`Anulado: ${viewDoc.voidReason}`} />
+            )}
+            {/* ── Información DTE ── */}
+            {viewDoc.status === 'EMITIDO' && (
+              <div style={{ marginTop: 12, padding: '8px 10px', borderRadius: 6,
+                background: 'hsl(var(--bg-muted, #f8f9fa))',
+                border: '1px solid hsl(var(--border-default, #e5e7eb))' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase' }}>
+                  Ministerio de Hacienda — DTE
+                </div>
+                <Row gutter={8} style={{ fontSize: 12 }}>
+                  <Col span={12}><b>Estado MH:</b> <Tag color={MH_STATUS_COLOR[viewDoc.estadoMH ?? 'PENDIENTE']}>{viewDoc.estadoMH ?? 'PENDIENTE'}</Tag></Col>
+                  {viewDoc.numeroControl && (
+                    <Col span={24} style={{ marginTop: 4 }}><b>Nº Control:</b> <code style={{ fontSize: 11 }}>{viewDoc.numeroControl}</code></Col>
+                  )}
+                  {viewDoc.codigoGeneracion && (
+                    <Col span={24} style={{ marginTop: 4 }}><b>Cód. Generación:</b> <code style={{ fontSize: 10 }}>{viewDoc.codigoGeneracion}</code></Col>
+                  )}
+                  {viewDoc.selloRecibido && (
+                    <Col span={24} style={{ marginTop: 4 }}><b>Sello MH:</b> <code style={{ fontSize: 11 }}>{viewDoc.selloRecibido}</code></Col>
+                  )}
+                  {viewDoc.estadoMH === 'CONTINGENCIA' && (
+                    <Col span={24} style={{ marginTop: 6 }}>
+                      <Alert type="warning" showIcon style={{ fontSize: 12 }}
+                        message="Pendiente de envío al MH"
+                        description={viewDoc.observacionesMH ?? 'Configure DTE_MODE=test con credenciales para conectar al MH'} />
+                    </Col>
+                  )}
+                </Row>
+              </div>
             )}
           </div>
         )}
