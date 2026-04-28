@@ -46,6 +46,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
             descripcion: l.descripcion ? String(l.descripcion).slice(0, 300) : null,
             monto:       Math.max(0, parseFloat(String(l.monto)) || 0),
             orden:       i,
+            accountId:   l.accountId ? String(l.accountId) : null,
+            projectId:   l.projectId ? String(l.projectId) : null,
           })),
         },
       },

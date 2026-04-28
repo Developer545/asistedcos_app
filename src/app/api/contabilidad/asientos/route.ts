@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
             include: { account: { select: { id: true, codigo: true, nombre: true } } },
             orderBy: { orden: 'asc' },
           },
-          periodo: { select: { id: true, nombre: true } },
+          periodo:  { select: { id: true, nombre: true } },
+          project:  { select: { id: true, name: true } },
         },
       }),
       prisma.journalEntry.count({ where }),
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await getCurrentUser();
-    const { fecha, concepto, tipo, origen, origenId, periodoId, lines } = await req.json();
+    const { fecha, concepto, tipo, origen, origenId, periodoId, projectId, lines } = await req.json();
 
     if (!concepto?.trim())       return apiError('El concepto es requerido', 400);
     if (!lines?.length)          return apiError('Debe incluir al menos una línea', 400);
@@ -64,10 +65,11 @@ export async function POST(req: NextRequest) {
         anio,
         fecha:    fecha ? new Date(fecha) : new Date(),
         concepto: concepto.trim(),
-        tipo:     tipo    ?? 'DIARIO',
-        origen:   origen  ?? 'MANUAL',
-        origenId: origenId ?? null,
+        tipo:      tipo      ?? 'DIARIO',
+        origen:    origen    ?? 'MANUAL',
+        origenId:  origenId  ?? null,
         periodoId: periodoId ?? null,
+        projectId: projectId ?? null,
         totalDebe,
         totalHaber,
         lines: {

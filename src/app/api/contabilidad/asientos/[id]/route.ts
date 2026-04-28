@@ -78,7 +78,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   try {
     await getCurrentUser();
     const { id } = await ctx.params;
-    const { fecha, concepto, tipo, periodoId, lines } = await req.json();
+    const { fecha, concepto, tipo, periodoId, projectId, lines } = await req.json();
 
     const asiento = await prisma.journalEntry.findUniqueOrThrow({ where: { id } });
     if (asiento.estado !== 'BORRADOR')
@@ -97,8 +97,9 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       data: {
         fecha:     fecha ? new Date(fecha) : undefined,
         concepto:  concepto?.trim(),
-        tipo:      tipo ?? undefined,
+        tipo:      tipo      ?? undefined,
         periodoId: periodoId ?? null,
+        projectId: projectId ?? null,
         totalDebe,
         totalHaber,
         lines: {

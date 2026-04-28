@@ -170,6 +170,7 @@ model Project {
   participations  VolunteerParticipation[]
   expenses        Expense[]
   inventoryItems  Product[]
+  journalEntries  JournalEntry[]
 
   @@map("projects")
 }
@@ -881,6 +882,9 @@ model JournalEntry {
   periodoId   String?
   periodo     AccountingPeriod? @relation(fields: [periodoId], references: [id])
 
+  projectId   String?            // Centro de costo — proyecto asociado
+  project     Project?           @relation(fields: [projectId], references: [id])
+
   totalDebe   Decimal        @default(0) @db.Decimal(14, 2)
   totalHaber  Decimal        @default(0) @db.Decimal(14, 2)
 
@@ -956,6 +960,10 @@ model BudgetLine {
   descripcion String?
   monto       Decimal  @default(0) @db.Decimal(12, 2)
   orden       Int      @default(0)
+
+  // Vinculación contable (opcional) para reporte Presupuesto vs. Ejecución
+  accountId   String?  // Cuenta del catálogo a comparar
+  projectId   String?  // Proyecto asociado a esta línea presupuestaria
 
   budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 

@@ -44,6 +44,8 @@ export async function POST(req: NextRequest) {
             descripcion: l.descripcion ? String(l.descripcion).slice(0, 300) : null,
             monto:       Math.max(0, parseFloat(String(l.monto)) || 0),
             orden:       i,
+            accountId:   l.accountId ? String(l.accountId) : null,
+            projectId:   l.projectId ? String(l.projectId) : null,
           })),
         },
       },

@@ -41,14 +41,15 @@ async function nextNumero(anio: number): Promise<number> {
 
 /** Crea el asiento en estado PUBLICADO directamente. */
 async function crearAsiento(opts: {
-  concepto:  string;
-  tipo:      string;
-  origen:    OrigenAsiento;
-  origenId:  string;
-  fecha:     Date;
-  lines:     LineInput[];
+  concepto:   string;
+  tipo:       string;
+  origen:     OrigenAsiento;
+  origenId:   string;
+  fecha:      Date;
+  lines:      LineInput[];
+  projectId?: string | null;
 }): Promise<void> {
-  const { concepto, tipo, origen, origenId, fecha, lines } = opts;
+  const { concepto, tipo, origen, origenId, fecha, lines, projectId } = opts;
   const anio  = fecha.getFullYear();
   const numero = await nextNumero(anio);
 
@@ -69,6 +70,7 @@ async function crearAsiento(opts: {
       tipo,
       origen,
       origenId,
+      projectId: projectId ?? null,
       totalDebe,
       totalHaber,
       estado: 'PUBLICADO',
@@ -151,7 +153,7 @@ export async function asientoGasto(expenseId: string): Promise<void> {
     const exp = await prisma.expense.findUnique({
       where:   { id: expenseId },
       select:  { id: true, description: true, amount: true, date: true,
-                 supplierId: true },
+                 supplierId: true, projectId: true },
     });
     if (!exp) return;
 
@@ -172,10 +174,11 @@ export async function asientoGasto(expenseId: string): Promise<void> {
     if (!creditId) { console.warn('[auto-asiento] Cuenta crédito no encontrada'); return; }
 
     await crearAsiento({
-      concepto:  `Gasto aprobado: ${exp.description}`,
-      tipo:      'GASTO',
-      origen:    'GASTO',
-      origenId:  exp.id,
+      concepto:   `Gasto aprobado: ${exp.description}`,
+      tipo:       'GASTO',
+      origen:     'GASTO',
+      origenId:   exp.id,
+      projectId:  exp.projectId,
       fecha,
       lines: [
         { accountId: gastoId,  descripcion: exp.description, debe: monto, haber: 0,     orden: 0 },
@@ -354,10 +357,11 @@ export async function asientoDonacion(donationId: string): Promise<void> {
     if (!bancoId || !donacionId_) { console.warn('[auto-asiento] Cuentas donación no encontradas'); return; }
 
     await crearAsiento({
-      concepto:  `Donación recibida — ${don.donor.name}`,
-      tipo:      'DONACION',
-      origen:    'DONACION',
-      origenId:  don.id,
+      concepto:   `Donación recibida — ${don.donor.name}`,
+      tipo:       'DONACION',
+      origen:     'DONACION',
+      origenId:   don.id,
+      projectId:  don.projectId,
       fecha,
       lines: [
         { accountId: bancoId,    descripcion: `Donación ${don.receiptNumber ?? ''} — ${don.donor.name}`, debe: monto, haber: 0,     orden: 0 },

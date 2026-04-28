@@ -36,6 +36,8 @@ type AsientoLine = {
   account?: { id: string; codigo: string; nombre: string };
 };
 
+type Proyecto = { id: string; name: string };
+
 type Asiento = {
   id: string; numero: number; anio: number;
   fecha: string; concepto: string; tipo: string;
@@ -43,6 +45,7 @@ type Asiento = {
   origen: string; totalDebe: number; totalHaber: number;
   lines: AsientoLine[];
   periodo?: { nombre: string } | null;
+  project?: { id: string; name: string } | null;
 };
 
 type Periodo = {
@@ -137,6 +140,7 @@ function AsientosTab() {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [tiposPartida, setTiposPartida] = useState<TipoPartida[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [filtroEstado, setFiltroEstado] = useState('');
 
   const load = useCallback(async () => {
@@ -159,6 +163,8 @@ function AsientosTab() {
       .then(r => r.json()).then(d => setPeriodos(d.data ?? []));
     fetch('/api/contabilidad/tipos-partida')
       .then(r => r.json()).then(d => setTiposPartida(d.data ?? []));
+    fetch('/api/proyectos?activos=1')
+      .then(r => r.json()).then(d => setProyectos((d.data ?? d ?? []).map((p: Proyecto) => ({ id: p.id, name: p.name }))));
   }, []);
 
   function openNew() {
@@ -174,6 +180,7 @@ function AsientosTab() {
     setEditing(a);
     form.setFieldsValue({
       concepto: a.concepto, tipo: a.tipo, periodoId: a.periodo?.nombre,
+      projectId: a.project?.id ?? null,
       fecha: dayjs(a.fecha),
     });
     setLines(a.lines.map(l => ({ ...l, debe: Number(l.debe), haber: Number(l.haber) })));
@@ -207,7 +214,7 @@ function AsientosTab() {
       const method = editing ? 'PUT' : 'POST';
       const r = await fetch(url, {
         method, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...vals, fecha: vals.fecha?.toISOString(), lines }),
+        body: JSON.stringify({ ...vals, fecha: vals.fecha?.toISOString(), lines, projectId: vals.projectId ?? null }),
       });
       if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? 'Error'); }
       toast.success(editing ? 'Asiento actualizado' : 'Asiento creado');
@@ -245,8 +252,12 @@ function AsientosTab() {
       render: v => fmtUSD(Number(v)) },
     { title: 'Haber', dataIndex: 'totalHaber', width: 110, align: 'right',
       render: v => fmtUSD(Number(v)) },
+    { title: 'Proyecto', key: 'project', width: 120, ellipsis: true,
+      render: (_: unknown, r: Asiento) => r.project
+        ? <Tag color="geekblue" style={{ fontSize: 11 }}>{r.project.name}</Tag>
+        : <span style={{ color: 'hsl(var(--text-muted))', fontSize: 11 }}>—</span> },
     { title: 'Estado', dataIndex: 'estado', width: 100, align: 'center',
-      render: v => <Badge status={v === 'PUBLICADO' ? 'success' : v === 'ANULADO' ? 'error' : 'default'}
+      render: (v: string) => <Badge status={v === 'PUBLICADO' ? 'success' : v === 'ANULADO' ? 'error' : 'default'}
                          text={v} /> },
     { title: 'Acciones', key: 'acc', width: 160, align: 'right',
       render: (_, r) => (
@@ -346,6 +357,13 @@ function AsientosTab() {
               <Form.Item name="periodoId" label="Período (opcional)">
                 <Select allowClear placeholder="Sin período"
                   options={periodos.filter(p => p.estado === 'ABIERTO').map(p => ({ value: p.id, label: p.nombre }))} />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item name="projectId" label="Proyecto / Centro de costo (opcional)">
+                <Select allowClear showSearch placeholder="Sin proyecto asignado"
+                  filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
+                  options={proyectos.map(p => ({ value: p.id, label: p.name }))} />
               </Form.Item>
             </Col>
           </Row>
@@ -900,21 +918,31 @@ function PeriodosTab() {
 /* ═══════════════════════════════════════════════════════════
    TAB: REPORTES CONTABLES ONG
    ═══════════════════════════════════════════════════════════ */
+type BudgetResumen = { id: string; nombre: string; anio: number; estado: string };
+
 function ReportesTab() {
   const [tipoReporte, setTipoReporte] = useState('estado_actividades');
   const [desde, setDesde]   = useState(dayjs().startOf('year'));
   const [hasta, setHasta]   = useState(dayjs().endOf('year'));
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<Record<string, unknown> | null>(null);
-  const [cuentas, setCuentas]       = useState<Cuenta[]>([]);
+  const [cuentas, setCuentas]           = useState<Cuenta[]>([]);
   const [cuentasTodas, setCuentasTodas] = useState<Cuenta[]>([]);
-  const [accountId, setAccountId] = useState('');
+  const [accountId, setAccountId]       = useState('');
+  const [budgets, setBudgets]           = useState<BudgetResumen[]>([]);
+  const [budgetId, setBudgetId]         = useState('');
+  const [proyectos, setProyectos]       = useState<Proyecto[]>([]);
+  const [filtroProjectId, setFiltroProjectId] = useState('');
 
   useEffect(() => {
     fetch('/api/contabilidad/cuentas?soloMovimiento=1')
       .then(r => r.json()).then(d => setCuentas(d.data ?? []));
     fetch('/api/contabilidad/cuentas')
       .then(r => r.json()).then(d => setCuentasTodas(d.data ?? []));
+    fetch('/api/presupuesto')
+      .then(r => r.json()).then(d => setBudgets(d.data ?? []));
+    fetch('/api/proyectos?activos=1')
+      .then(r => r.json()).then(d => setProyectos((d.data ?? d ?? []).map((p: Proyecto) => ({ id: p.id, name: p.name }))));
   }, []);
 
   async function generar() {
@@ -925,7 +953,12 @@ function ReportesTab() {
         desde: desde.toISOString(),
         hasta: hasta.toISOString(),
       });
-      if (tipoReporte === 'libro_mayor' && accountId) params.set('accountId', accountId);
+      if ((tipoReporte === 'libro_mayor' || tipoReporte === 'libro_auxiliar') && accountId)
+        params.set('accountId', accountId);
+      if (tipoReporte === 'presupuesto_ejecucion' && budgetId)
+        params.set('budgetId', budgetId);
+      if (filtroProjectId)
+        params.set('projectId', filtroProjectId);
       const r = await fetch(`/api/contabilidad/reportes?${params}`);
       const d = await r.json();
       setResultado(d.data ?? d);
@@ -942,12 +975,14 @@ function ReportesTab() {
             <div style={{ fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Tipo de reporte</div>
             <Select value={tipoReporte} onChange={setTipoReporte} style={{ width: '100%' }}
               options={[
-                { value: 'estado_actividades',  label: '📊 Estado de Actividades (ONG)' },
-                { value: 'balance_general',      label: '🏦 Balance General (Situación Financiera)' },
-                { value: 'balance_comprobacion', label: '⚖️  Balance de Comprobación' },
-                { value: 'libro_diario',         label: '📖 Libro Diario' },
-                { value: 'libro_mayor',          label: '📋 Libro Mayor' },
-                { value: 'libro_auxiliar',       label: '📂 Libro Auxiliar' },
+                { value: 'estado_actividades',   label: '📊 Estado de Actividades (ONG)' },
+                { value: 'balance_general',       label: '🏦 Balance General (Situación Financiera)' },
+                { value: 'balance_comprobacion',  label: '⚖️  Balance de Comprobación' },
+                { value: 'libro_diario',          label: '📖 Libro Diario' },
+                { value: 'libro_mayor',           label: '📋 Libro Mayor' },
+                { value: 'libro_auxiliar',        label: '📂 Libro Auxiliar' },
+                { value: 'presupuesto_ejecucion', label: '🎯 Presupuesto vs. Ejecución' },
+                { value: 'gastos_por_proyecto',   label: '🗂️ Gastos por Proyecto' },
               ]} />
           </Col>
           <Col span={4}>
@@ -974,6 +1009,24 @@ function ReportesTab() {
                 value={accountId || undefined} onChange={setAccountId}
                 filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
                 options={cuentasTodas.map(c => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))} />
+            </Col>
+          )}
+          {tipoReporte === 'presupuesto_ejecucion' && (
+            <Col span={7}>
+              <div style={{ fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Presupuesto</div>
+              <Select showSearch style={{ width: '100%' }} placeholder="Seleccionar presupuesto..."
+                value={budgetId || undefined} onChange={setBudgetId}
+                filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
+                options={budgets.map(b => ({ value: b.id, label: `${b.nombre} (${b.anio})` }))} />
+            </Col>
+          )}
+          {(tipoReporte === 'presupuesto_ejecucion' || tipoReporte === 'gastos_por_proyecto') && (
+            <Col span={5}>
+              <div style={{ fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Filtrar proyecto</div>
+              <Select showSearch allowClear style={{ width: '100%' }} placeholder="Todos los proyectos"
+                value={filtroProjectId || undefined} onChange={v => setFiltroProjectId(v ?? '')}
+                filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
+                options={proyectos.map(p => ({ value: p.id, label: p.name }))} />
             </Col>
           )}
           <Col>
@@ -1005,6 +1058,12 @@ function ReportesTab() {
         )}
         {resultado && tipoReporte === 'libro_auxiliar' && (
           <LibroAuxiliarView data={resultado as LibroAuxiliarData} />
+        )}
+        {resultado && tipoReporte === 'presupuesto_ejecucion' && (
+          <PresupuestoEjecucionView data={resultado as PresupuestoEjecucionData} />
+        )}
+        {resultado && tipoReporte === 'gastos_por_proyecto' && (
+          <GastosPorProyectoView data={resultado as GastosPorProyectoData} />
         )}
       </Spin>
     </>
@@ -1172,7 +1231,30 @@ function LibroDiarioView({ data }: { data: LibroDiarioData }) {
   );
 }
 
-/* ─── Tipos de datos para nuevos reportes ────────────────────── */
+/* ─── Tipos para reportes Fase B ─────────────────────────────── */
+type PresupuestoLinea = {
+  id: string; tipo: string; categoria: string; descripcion?: string;
+  presupuestado: number; ejecutado: number; variacion: number;
+  porcEjecucion: number; sobreEjecutado: boolean;
+};
+type PresupuestoEjecucionData = {
+  budget: { nombre: string; anio: number; estado: string };
+  lineas: PresupuestoLinea[];
+  resumen: {
+    totalPresupIngresos: number; totalPresupGastos: number;
+    totalEjecIngresos:   number; totalEjecGastos:   number;
+    porcEjecIngresos: number; porcEjecGastos: number;
+    superavitPresup: number; superavitReal: number;
+  };
+};
+
+type ProyectoGasto = { proyectoId: string | null; proyectoNombre: string; gastos: number; ingresos: number; resultado: number };
+type GastosPorProyectoData = {
+  proyectos: ProyectoGasto[];
+  totales: { gastos: number; ingresos: number };
+};
+
+/* ─── Tipos de datos para reportes Fase A ────────────────────── */
 type LineaBG = { codigo: string; nombre: string; saldo: number; nivel: number };
 type BalanceGeneralData = {
   activos: LineaBG[]; pasivos: LineaBG[]; patrimonios: LineaBG[];
@@ -1381,6 +1463,203 @@ function LibroAuxiliarView({ data }: { data: LibroAuxiliarData }) {
           </span>
         </Card>
       )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TAB: TIPOS DE PARTIDA (CRUD)
+   ═══════════════════════════════════════════════════════════ */
+/* ─── Presupuesto vs. Ejecución ──────────────────────────────── */
+function PresupuestoEjecucionView({ data }: { data: PresupuestoEjecucionData }) {
+  const { resumen, budget } = data;
+  const lineasIngreso = data.lineas.filter(l => l.tipo === 'ingreso');
+  const lineasGasto   = data.lineas.filter(l => l.tipo === 'gasto');
+
+  const colsLinea: ColumnsType<PresupuestoLinea> = [
+    { title: 'Categoría',     dataIndex: 'categoria',     ellipsis: true },
+    { title: 'Descripción',   dataIndex: 'descripcion',   ellipsis: true, render: v => v ?? '—' },
+    { title: 'Presupuestado', dataIndex: 'presupuestado', align: 'right', width: 130,
+      render: v => fmtUSD(v) },
+    { title: 'Ejecutado',     dataIndex: 'ejecutado',     align: 'right', width: 130,
+      render: v => fmtUSD(v) },
+    { title: 'Variación',     dataIndex: 'variacion',     align: 'right', width: 120,
+      render: (v: number, r: PresupuestoLinea) => (
+        <span style={{ fontWeight: 700, color: r.sobreEjecutado ? '#dc2626' : '#16a34a' }}>
+          {v >= 0 ? '+' : ''}{fmtUSD(v)}
+        </span>
+      ),
+    },
+    { title: '% Ejec.',       dataIndex: 'porcEjecucion', align: 'right', width: 90,
+      render: (v: number, r: PresupuestoLinea) => (
+        <span style={{ fontWeight: 600, color: r.sobreEjecutado ? '#dc2626' : v >= 80 ? '#16a34a' : '#ca8a04' }}>
+          {v.toFixed(1)}%
+        </span>
+      ),
+    },
+  ];
+
+  const seccion = (titulo: string, lineas: PresupuestoLinea[], presup: number, ejec: number, color: string) => (
+    <Card title={<span style={{ color }}>{titulo}</span>} size="small" style={{ marginBottom: 12, borderRadius: 8, borderTop: `3px solid ${color}` }}>
+      <Table
+        dataSource={lineas} rowKey="id" size="small" pagination={false}
+        columns={colsLinea}
+        summary={() => (
+          <Table.Summary.Row style={{ fontWeight: 700, background: 'hsl(var(--bg-page))' }}>
+            <Table.Summary.Cell index={0} colSpan={2}>TOTAL {titulo.toUpperCase()}</Table.Summary.Cell>
+            <Table.Summary.Cell index={2} align="right">{fmtUSD(presup)}</Table.Summary.Cell>
+            <Table.Summary.Cell index={3} align="right">{fmtUSD(ejec)}</Table.Summary.Cell>
+            <Table.Summary.Cell index={4} align="right" colSpan={2}>
+              <span style={{ color: ejec > presup ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+                {presup > 0 ? ((ejec / presup) * 100).toFixed(1) : '0.0'}%
+              </span>
+            </Table.Summary.Cell>
+          </Table.Summary.Row>
+        )}
+      />
+    </Card>
+  );
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>FUNDACIÓN ASISTEDCOS EL SALVADOR</div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>ESTADO DE COMPROBACIÓN PRESUPUESTARIA</div>
+        <div style={{ color: 'hsl(var(--text-muted))', fontSize: 12 }}>
+          {budget.nombre} — Año {budget.anio} <Tag style={{ marginLeft: 8 }}>{budget.estado}</Tag>
+        </div>
+      </div>
+
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #16a34a' }}>
+            <Statistic title="Ingresos Presupuestados" value={resumen.totalPresupIngresos} prefix="$" precision={2} valueStyle={{ color: '#16a34a', fontSize: 16 }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #2563eb' }}>
+            <Statistic title="Ingresos Ejecutados" value={resumen.totalEjecIngresos} prefix="$" precision={2}
+              suffix={<span style={{ fontSize: 13, fontWeight: 700, color: '#2563eb' }}> {resumen.porcEjecIngresos.toFixed(1)}%</span>}
+              valueStyle={{ color: '#2563eb', fontSize: 16 }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #dc2626' }}>
+            <Statistic title="Gastos Presupuestados" value={resumen.totalPresupGastos} prefix="$" precision={2} valueStyle={{ color: '#dc2626', fontSize: 16 }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #ea580c' }}>
+            <Statistic title="Gastos Ejecutados" value={resumen.totalEjecGastos} prefix="$" precision={2}
+              suffix={<span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}> {resumen.porcEjecGastos.toFixed(1)}%</span>}
+              valueStyle={{ color: '#ea580c', fontSize: 16 }} />
+          </Card>
+        </Col>
+      </Row>
+
+      {seccion('Ingresos', lineasIngreso, resumen.totalPresupIngresos, resumen.totalEjecIngresos, '#16a34a')}
+      {seccion('Gastos',   lineasGasto,   resumen.totalPresupGastos,  resumen.totalEjecGastos,  '#dc2626')}
+
+      <Row gutter={12} style={{ marginTop: 8 }}>
+        <Col span={12}>
+          <Card size="small" style={{ borderRadius: 8, background: resumen.superavitPresup >= 0 ? '#f0fdf4' : '#fef2f2' }}>
+            <div style={{ fontWeight: 600, fontSize: 12, color: 'hsl(var(--text-muted))' }}>Superávit presupuestado</div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: resumen.superavitPresup >= 0 ? '#16a34a' : '#dc2626' }}>
+              {resumen.superavitPresup >= 0 ? '+' : ''}{fmtUSD(resumen.superavitPresup)}
+            </div>
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card size="small" style={{ borderRadius: 8, background: resumen.superavitReal >= 0 ? '#f0fdf4' : '#fef2f2' }}>
+            <div style={{ fontWeight: 600, fontSize: 12, color: 'hsl(var(--text-muted))' }}>Resultado real ejecutado</div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: resumen.superavitReal >= 0 ? '#16a34a' : '#dc2626' }}>
+              {resumen.superavitReal >= 0 ? '+' : ''}{fmtUSD(resumen.superavitReal)}
+            </div>
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+/* ─── Gastos por Proyecto ─────────────────────────────────────── */
+function GastosPorProyectoView({ data }: { data: GastosPorProyectoData }) {
+  const maxGasto = Math.max(...data.proyectos.map(p => p.gastos), 1);
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>FUNDACIÓN ASISTEDCOS EL SALVADOR</div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>GASTOS POR CENTRO DE COSTO / PROYECTO</div>
+      </div>
+
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        <Col span={8}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #dc2626' }}>
+            <Statistic title="Total Gastos" value={data.totales.gastos} prefix="$" precision={2} valueStyle={{ color: '#dc2626' }} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #16a34a' }}>
+            <Statistic title="Total Ingresos" value={data.totales.ingresos} prefix="$" precision={2} valueStyle={{ color: '#16a34a' }} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #6d28d9' }}>
+            <Statistic title="Proyectos con movimientos" value={data.proyectos.length} valueStyle={{ color: '#6d28d9' }} />
+          </Card>
+        </Col>
+      </Row>
+
+      <Table
+        dataSource={data.proyectos}
+        rowKey={r => r.proyectoId ?? 'sin-proyecto'}
+        size="small"
+        pagination={false}
+        columns={[
+          { title: 'Proyecto / Centro de Costo', key: 'proyecto',
+            render: (_: unknown, r: ProyectoGasto) => r.proyectoId
+              ? <Tag color="geekblue">{r.proyectoNombre}</Tag>
+              : <span style={{ color: 'hsl(var(--text-muted))', fontStyle: 'italic' }}>Sin proyecto asignado</span>
+          },
+          { title: 'Gastos', dataIndex: 'gastos', align: 'right', width: 130,
+            render: (v: number) => <b style={{ color: '#dc2626' }}>{fmtUSD(v)}</b> },
+          { title: 'Ingresos', dataIndex: 'ingresos', align: 'right', width: 130,
+            render: (v: number) => <b style={{ color: '#16a34a' }}>{fmtUSD(v)}</b> },
+          { title: 'Resultado', dataIndex: 'resultado', align: 'right', width: 130,
+            render: (v: number) => <b style={{ color: v >= 0 ? '#16a34a' : '#dc2626', fontWeight: 800 }}>
+              {v >= 0 ? '+' : ''}{fmtUSD(v)}
+            </b> },
+          { title: '% del total gastos', key: 'barra', width: 180,
+            render: (_: unknown, r: ProyectoGasto) => {
+              const pct = maxGasto > 0 ? (r.gastos / maxGasto) * 100 : 0;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ flex: 1, background: '#fee2e2', borderRadius: 4, height: 10 }}>
+                    <div style={{ width: `${pct}%`, background: '#dc2626', height: '100%', borderRadius: 4, transition: 'width .3s' }} />
+                  </div>
+                  <span style={{ fontSize: 11, minWidth: 38, color: 'hsl(var(--text-muted))' }}>
+                    {data.totales.gastos > 0 ? ((r.gastos / data.totales.gastos) * 100).toFixed(1) : '0.0'}%
+                  </span>
+                </div>
+              );
+            },
+          },
+        ]}
+        summary={() => (
+          <Table.Summary.Row style={{ fontWeight: 700, background: 'hsl(var(--bg-page))' }}>
+            <Table.Summary.Cell index={0}>TOTAL</Table.Summary.Cell>
+            <Table.Summary.Cell index={1} align="right"><span style={{ color: '#dc2626' }}>{fmtUSD(data.totales.gastos)}</span></Table.Summary.Cell>
+            <Table.Summary.Cell index={2} align="right"><span style={{ color: '#16a34a' }}>{fmtUSD(data.totales.ingresos)}</span></Table.Summary.Cell>
+            <Table.Summary.Cell index={3} align="right">
+              <span style={{ color: (data.totales.ingresos - data.totales.gastos) >= 0 ? '#16a34a' : '#dc2626' }}>
+                {fmtUSD(data.totales.ingresos - data.totales.gastos)}
+              </span>
+            </Table.Summary.Cell>
+            <Table.Summary.Cell index={4} />
+          </Table.Summary.Row>
+        )}
+      />
     </div>
   );
 }

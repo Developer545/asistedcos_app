@@ -16,17 +16,21 @@ export async function GET(req: NextRequest) {
     const desde     = req.nextUrl.searchParams.get('desde');
     const hasta     = req.nextUrl.searchParams.get('hasta');
     const accountId = req.nextUrl.searchParams.get('accountId') ?? '';
+    const budgetId  = req.nextUrl.searchParams.get('budgetId')  ?? '';
+    const projectId = req.nextUrl.searchParams.get('projectId') ?? '';
 
     const fechaDesde = desde ? new Date(desde) : new Date(new Date().getFullYear(), 0, 1);
     const fechaHasta = hasta ? new Date(hasta) : new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
 
     switch (tipo) {
-      case 'balance_comprobacion': return ok(await balanceComprobacion(fechaDesde, fechaHasta));
-      case 'libro_mayor':         return ok(await libroMayor(accountId, fechaDesde, fechaHasta));
-      case 'libro_auxiliar':      return ok(await libroAuxiliar(accountId, fechaDesde, fechaHasta));
-      case 'libro_diario':        return ok(await libroDiario(fechaDesde, fechaHasta));
-      case 'estado_actividades':  return ok(await estadoActividades(fechaDesde, fechaHasta));
-      case 'balance_general':     return ok(await balanceGeneral(fechaDesde, fechaHasta));
+      case 'balance_comprobacion':   return ok(await balanceComprobacion(fechaDesde, fechaHasta));
+      case 'libro_mayor':            return ok(await libroMayor(accountId, fechaDesde, fechaHasta));
+      case 'libro_auxiliar':         return ok(await libroAuxiliar(accountId, fechaDesde, fechaHasta));
+      case 'libro_diario':           return ok(await libroDiario(fechaDesde, fechaHasta));
+      case 'estado_actividades':     return ok(await estadoActividades(fechaDesde, fechaHasta));
+      case 'balance_general':        return ok(await balanceGeneral(fechaDesde, fechaHasta));
+      case 'presupuesto_ejecucion':  return ok(await presupuestoEjecucion(budgetId, projectId, fechaDesde, fechaHasta));
+      case 'gastos_por_proyecto':    return ok(await gastosPorProyecto(fechaDesde, fechaHasta));
       default: return apiError('Tipo de reporte no válido', 400);
     }
   } catch (e) { return apiError(e); }
@@ -423,5 +427,166 @@ async function balanceGeneral(desde: Date, hasta: Date) {
     patrimonios,
     totales: { totalActivo, totalPasivo, totalPatrimonio },
     cuadra,
+  };
+}
+
+/* ── Presupuesto vs. Ejecución ──────────────────────────────── */
+// Compara líneas del presupuesto con movimientos reales en el diario
+async function presupuestoEjecucion(budgetId: string, projectId: string, desde: Date, hasta: Date) {
+  if (!budgetId) throw new Error('budgetId es requerido para este reporte');
+
+  const budget = await prisma.budget.findUniqueOrThrow({
+    where:   { id: budgetId },
+    include: { lineas: { orderBy: { orden: 'asc' } } },
+  });
+
+  // Para cada línea con accountId, calcular el ejecutado real desde journal_lines
+  const lineasConEjecucion = await Promise.all(
+    budget.lineas.map(async (linea) => {
+      let ejecutado = 0;
+
+      if (linea.accountId) {
+        // Comparar contra movimientos contables de esa cuenta
+        const lines = await prisma.journalLine.findMany({
+          where: {
+            accountId: linea.accountId,
+            entry: {
+              fecha:  { gte: desde, lte: hasta },
+              estado: 'PUBLICADO',
+              ...(projectId ? { projectId } : {}),
+            },
+          },
+          include: { account: { select: { naturaleza: true } } },
+        });
+        // Saldo según naturaleza (gasto=deudora, ingreso=acreedora)
+        ejecutado = lines.reduce((s, l) => {
+          const debe = Number(l.debe), haber = Number(l.haber);
+          return s + (l.account.naturaleza === 'DEUDORA' ? debe - haber : haber - debe);
+        }, 0);
+      } else if (linea.tipo === 'gasto') {
+        // Sin cuenta vinculada: usar gastos operacionales filtrados por proyecto
+        const where: Record<string, unknown> = { date: { gte: desde, lte: hasta } };
+        if (projectId) where.projectId = projectId;
+        const agg = await prisma.expense.aggregate({ where, _sum: { amount: true } });
+        ejecutado = Number(agg._sum.amount ?? 0);
+      } else {
+        // ingreso sin cuenta: usar donaciones
+        const where: Record<string, unknown> = { date: { gte: desde, lte: hasta } };
+        if (projectId) where.projectId = projectId;
+        const agg = await prisma.donation.aggregate({ where, _sum: { amount: true } });
+        ejecutado = Number(agg._sum.amount ?? 0);
+      }
+
+      const presupuestado = Number(linea.monto);
+      const variacion     = ejecutado - presupuestado;
+      const porcEjecucion = presupuestado > 0 ? Math.round((ejecutado / presupuestado) * 100) : 0;
+
+      return {
+        id:           linea.id,
+        tipo:         linea.tipo,
+        categoria:    linea.categoria,
+        descripcion:  linea.descripcion,
+        accountId:    linea.accountId,
+        presupuestado,
+        ejecutado,
+        variacion,
+        porcEjecucion,
+        sobreEjecutado: ejecutado > presupuestado,
+      };
+    }),
+  );
+
+  const totalPresupIngresos = lineasConEjecucion.filter(l => l.tipo === 'ingreso').reduce((s, l) => s + l.presupuestado, 0);
+  const totalPresupGastos   = lineasConEjecucion.filter(l => l.tipo === 'gasto').reduce((s, l) => s + l.presupuestado, 0);
+  const totalEjecIngresos   = lineasConEjecucion.filter(l => l.tipo === 'ingreso').reduce((s, l) => s + l.ejecutado, 0);
+  const totalEjecGastos     = lineasConEjecucion.filter(l => l.tipo === 'gasto').reduce((s, l) => s + l.ejecutado, 0);
+
+  return {
+    tipo: 'presupuesto_ejecucion',
+    budget: {
+      id: budget.id, nombre: budget.nombre, anio: budget.anio, estado: budget.estado,
+    },
+    desde, hasta,
+    lineas: lineasConEjecucion,
+    resumen: {
+      totalPresupIngresos, totalPresupGastos,
+      totalEjecIngresos,   totalEjecGastos,
+      porcEjecIngresos: totalPresupIngresos > 0 ? Math.round((totalEjecIngresos / totalPresupIngresos) * 100) : 0,
+      porcEjecGastos:   totalPresupGastos   > 0 ? Math.round((totalEjecGastos   / totalPresupGastos)   * 100) : 0,
+      superavitPresup:  totalPresupIngresos - totalPresupGastos,
+      superavitReal:    totalEjecIngresos   - totalEjecGastos,
+    },
+  };
+}
+
+/* ── Gastos por Proyecto (centro de costo) ──────────────────── */
+async function gastosPorProyecto(desde: Date, hasta: Date) {
+  // Agrupar asientos publicados por proyecto + tipo de cuenta
+  const entries = await prisma.journalEntry.findMany({
+    where: {
+      fecha:  { gte: desde, lte: hasta },
+      estado: 'PUBLICADO',
+    },
+    include: {
+      project: { select: { id: true, name: true } },
+      lines: {
+        include: {
+          account: { select: { codigo: true, nombre: true, tipo: true, naturaleza: true } },
+        },
+      },
+    },
+  });
+
+  // Agrupar por proyecto
+  const proyMap = new Map<string, {
+    proyecto: { id: string; name: string } | null;
+    gastos:   number;
+    ingresos: number;
+    lineas:   { codigo: string; nombre: string; tipo: string; monto: number }[];
+  }>();
+
+  const sinProyectoKey = '__sin_proyecto__';
+
+  for (const entry of entries) {
+    const key       = entry.projectId ?? sinProyectoKey;
+    const proyecto  = entry.project;
+
+    if (!proyMap.has(key)) {
+      proyMap.set(key, {
+        proyecto: proyecto ?? null,
+        gastos: 0, ingresos: 0, lineas: [],
+      });
+    }
+    const proy = proyMap.get(key)!;
+
+    for (const l of entry.lines) {
+      const debe  = Number(l.debe);
+      const haber = Number(l.haber);
+      const saldo = l.account.naturaleza === 'DEUDORA' ? debe - haber : haber - debe;
+
+      if (l.account.tipo === 'GASTO' || l.account.tipo === 'COSTO') {
+        proy.gastos += Math.max(0, saldo);
+      } else if (l.account.tipo === 'INGRESO') {
+        proy.ingresos += Math.max(0, saldo);
+      }
+    }
+  }
+
+  const proyectos = [...proyMap.entries()].map(([key, v]) => ({
+    proyectoId:   key === sinProyectoKey ? null : key,
+    proyectoNombre: v.proyecto?.name ?? 'Sin proyecto asignado',
+    gastos:       v.gastos,
+    ingresos:     v.ingresos,
+    resultado:    v.ingresos - v.gastos,
+  })).sort((a, b) => b.gastos - a.gastos);
+
+  return {
+    tipo: 'gastos_por_proyecto',
+    desde, hasta,
+    proyectos,
+    totales: {
+      gastos:   proyectos.reduce((s, p) => s + p.gastos,   0),
+      ingresos: proyectos.reduce((s, p) => s + p.ingresos, 0),
+    },
   };
 }
