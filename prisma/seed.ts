@@ -159,6 +159,9 @@ async function main() {
   await seedCatalogoCuentasONG();
   console.log('✅ Catálogo de cuentas ONG creado');
 
+  /* ── Tipos de partida contable ──────────────────── */
+  await seedTiposPartida();
+
   console.log('\n🎉 Seed completado exitosamente.');
 }
 
@@ -352,6 +355,32 @@ async function seedCatalogoCuentasONG() {
   }
 
   console.log(`  ✅ ${sorted.length} cuentas creadas en el catálogo ONG`);
+}
+
+async function seedTiposPartida() {
+  const tipos = [
+    { codigo: 'DIARIO',        nombre: 'Diario',                      descripcion: 'Asiento contable general del día',               orden: 1 },
+    { codigo: 'AJUSTE',        nombre: 'Ajuste de período',            descripcion: 'Corrección o ajuste de fin de período',          orden: 2 },
+    { codigo: 'APERTURA',      nombre: 'Apertura',                     descripcion: 'Asiento de apertura del ejercicio fiscal',        orden: 3 },
+    { codigo: 'CIERRE',        nombre: 'Cierre',                       descripcion: 'Asiento de cierre del ejercicio fiscal',          orden: 4 },
+    { codigo: 'VENTA',         nombre: 'Venta / Ingreso',              descripcion: 'Registro de ingresos por servicios o DTE',        orden: 5 },
+    { codigo: 'COMPRA',        nombre: 'Compra',                       descripcion: 'Registro de adquisición de bienes o servicios',   orden: 6 },
+    { codigo: 'GASTO',         nombre: 'Gasto',                        descripcion: 'Registro de gastos operativos o administrativos', orden: 7 },
+    { codigo: 'PLANILLA',      nombre: 'Planilla',                     descripcion: 'Provisión y pago de nómina',                     orden: 8 },
+    { codigo: 'DONACION',      nombre: 'Donación',                     descripcion: 'Registro de donaciones recibidas',               orden: 9 },
+    { codigo: 'DEPRECIACION',  nombre: 'Depreciación',                 descripcion: 'Gasto de depreciación de activos fijos',          orden: 10 },
+    { codigo: 'PROVISION',     nombre: 'Provisión',                    descripcion: 'Provisión de obligaciones futuras',              orden: 11 },
+    { codigo: 'TRANSFERENCIA', nombre: 'Transferencia entre cuentas',  descripcion: 'Movimiento interno entre cuentas bancarias',     orden: 12 },
+  ];
+
+  for (const t of tipos) {
+    await prisma.journalEntryType.upsert({
+      where:  { codigo: t.codigo },
+      update: { nombre: t.nombre, descripcion: t.descripcion, orden: t.orden },
+      create: t,
+    });
+  }
+  console.log(`  ✅ ${tipos.length} tipos de partida creados`);
 }
 
 main()

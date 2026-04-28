@@ -852,6 +852,20 @@ model AccountingPeriod {
   @@map("accounting_periods")
 }
 
+// Tipos de partida contable (configurables por el usuario)
+model JournalEntryType {
+  id          String   @id @default(cuid())
+  codigo      String   @unique  // e.g. "DIARIO", "AJUSTE", "APERTURA"
+  nombre      String            // Nombre legible
+  descripcion String?
+  activo      Boolean  @default(true)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("journal_entry_types")
+}
+
 // Asientos contables
 model JournalEntry {
   id          String         @id @default(cuid())
@@ -859,7 +873,7 @@ model JournalEntry {
   anio        Int
   fecha       DateTime
   concepto    String
-  tipo        String         @default("DIARIO") // DIARIO | AJUSTE | APERTURA | CIERRE
+  tipo        String         @default("DIARIO") // código de JournalEntryType
   estado      EstadoAsiento  @default(BORRADOR)
   origen      OrigenAsiento  @default(MANUAL)
   origenId    String?        // ID del documento fuente (invoice, expense, etc.)

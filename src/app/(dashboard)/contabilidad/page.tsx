@@ -17,6 +17,11 @@ import dayjs from 'dayjs';
 import PageHeader from '@/components/shared/PageHeader';
 
 /* ─── Tipos ──────────────────────────────────────────────── */
+type TipoPartida = {
+  id: string; codigo: string; nombre: string;
+  descripcion?: string; activo: boolean; orden: number;
+};
+
 type Cuenta = {
   id: string; codigo: string; nombre: string;
   tipo: string; naturaleza: string; nivel: number;
@@ -102,6 +107,7 @@ function ContabilidadInner() {
           { key: 'asientos',  label: <span><ListNumbers size={14} style={{ marginRight: 5 }} />Asientos</span>,  children: <AsientosTab /> },
           { key: 'cuentas',   label: <span><BookOpen    size={14} style={{ marginRight: 5 }} />Catálogo</span>,  children: <CuentasTab /> },
           { key: 'periodos',  label: <span><CalendarBlank size={14} style={{ marginRight: 5 }} />Períodos</span>, children: <PeriodosTab /> },
+          { key: 'tipos',     label: <span><ListNumbers size={14} style={{ marginRight: 5 }} />Tipos de Partida</span>, children: <TiposPartidaTab /> },
           { key: 'reportes',  label: <span><ChartLine   size={14} style={{ marginRight: 5 }} />Reportes</span>,  children: <ReportesTab /> },
         ]}
       />
@@ -130,6 +136,7 @@ function AsientosTab() {
   const [lines, setLines]     = useState<AsientoLine[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
+  const [tiposPartida, setTiposPartida] = useState<TipoPartida[]>([]);
   const [filtroEstado, setFiltroEstado] = useState('');
 
   const load = useCallback(async () => {
@@ -150,6 +157,8 @@ function AsientosTab() {
       .then(r => r.json()).then(d => setCuentas(d.data ?? []));
     fetch('/api/contabilidad/periodos')
       .then(r => r.json()).then(d => setPeriodos(d.data ?? []));
+    fetch('/api/contabilidad/tipos-partida')
+      .then(r => r.json()).then(d => setTiposPartida(d.data ?? []));
   }, []);
 
   function openNew() {
@@ -327,7 +336,10 @@ function AsientosTab() {
             </Col>
             <Col span={4}>
               <Form.Item name="tipo" label="Tipo">
-                <Select options={['DIARIO','AJUSTE','APERTURA','CIERRE'].map(v => ({ value: v, label: v }))} />
+                <Select
+                  options={tiposPartida.filter(t => t.activo).map(t => ({ value: t.codigo, label: t.nombre }))}
+                  placeholder="Tipo..."
+                />
               </Form.Item>
             </Col>
             <Col span={5}>
@@ -638,6 +650,15 @@ function PeriodosTab() {
   const [saving, setSaving]   = useState(false);
   const [form]                = Form.useForm();
 
+  // Cierre contable
+  const [modalCierre, setModalCierre]   = useState(false);
+  const [cierreAnio, setCierreAnio]     = useState(new Date().getFullYear());
+  const [cierrePreview, setCierrePreview] = useState<Record<string, unknown> | null>(null);
+  const [loadingCierre, setLoadingCierre] = useState(false);
+  const [savingCierre, setSavingCierre]   = useState(false);
+  const [cuentaPatrimonioId, setCuentaPatrimonioId] = useState('');
+  const [cuentasPatrimonio, setCuentasPatrimonio]   = useState<Cuenta[]>([]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -677,6 +698,37 @@ function PeriodosTab() {
       toast.success(`Período ${nuevo === 'CERRADO' ? 'cerrado' : 'reabierto'}`);
       load();
     } catch { toast.error('Error actualizando período'); }
+  }
+
+  async function abrirCierre() {
+    // Cargar cuentas de patrimonio y preview del cierre
+    setLoadingCierre(true);
+    try {
+      const [cuentasR, previewR] = await Promise.all([
+        fetch('/api/contabilidad/cuentas?tipo=PATRIMONIO&soloMovimiento=1').then(r => r.json()),
+        fetch(`/api/contabilidad/cierre?anio=${cierreAnio}`).then(r => r.json()),
+      ]);
+      setCuentasPatrimonio(cuentasR.data ?? []);
+      setCierrePreview(previewR.data ?? null);
+      setModalCierre(true);
+    } catch { toast.error('Error cargando preview del cierre'); }
+    finally { setLoadingCierre(false); }
+  }
+
+  async function ejecutarCierre() {
+    if (!cuentaPatrimonioId) { toast.error('Selecciona la cuenta de patrimonio destino'); return; }
+    setSavingCierre(true);
+    try {
+      const r = await fetch('/api/contabilidad/cierre', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anio: cierreAnio, cuentaPatrimonioId }),
+      });
+      if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? 'Error'); }
+      toast.success(`Cierre del año ${cierreAnio} ejecutado correctamente`);
+      setModalCierre(false); load();
+    } catch (e: unknown) {
+      if (e instanceof Error) toast.error(e.message);
+    } finally { setSavingCierre(false); }
   }
 
   const cols: ColumnsType<Periodo> = [
@@ -719,13 +771,106 @@ function PeriodosTab() {
         </Col>
       </Row>
 
-      <Row justify="end" style={{ marginBottom: 12 }}>
-        <Button type="primary" icon={<Plus size={14} />} onClick={() => { form.resetFields(); setModal(true); }}>
-          Nuevo período
-        </Button>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 12 }}>
+        <Col>
+          <Space>
+            <InputNumber
+              value={cierreAnio} onChange={v => v && setCierreAnio(v)}
+              min={2020} max={2100} style={{ width: 100 }}
+              addonBefore="Año"
+            />
+            <Button
+              onClick={abrirCierre} loading={loadingCierre}
+              style={{ borderColor: '#7c3aed', color: '#7c3aed' }}
+            >
+              Ejecutar Cierre Contable
+            </Button>
+          </Space>
+        </Col>
+        <Col>
+          <Button type="primary" icon={<Plus size={14} />} onClick={() => { form.resetFields(); setModal(true); }}>
+            Nuevo período
+          </Button>
+        </Col>
       </Row>
 
       <Table dataSource={data} columns={cols} rowKey="id" loading={loading} size="small" pagination={false} />
+
+      {/* Modal cierre contable */}
+      <Modal
+        title={`Cierre Contable — Año ${cierreAnio}`}
+        open={modalCierre} onCancel={() => setModalCierre(false)} footer={null} width={700}
+      >
+        {cierrePreview && (
+          <>
+            {(cierrePreview.cierreExistente as boolean) && (
+              <Alert type="error" showIcon message={`Ya existe un cierre para el año ${cierreAnio}`} style={{ marginBottom: 16 }} />
+            )}
+            {(cierrePreview.borradores as number) > 0 && (
+              <Alert type="warning" showIcon
+                message={`Existen ${cierrePreview.borradores as number} asiento(s) en borrador — publícalos antes del cierre`}
+                style={{ marginBottom: 16 }} />
+            )}
+            <Row gutter={12} style={{ marginBottom: 16 }}>
+              <Col span={8}>
+                <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #16a34a' }}>
+                  <Statistic title="Total Ingresos" value={cierrePreview.totalIngresos as number} prefix="$" precision={2} valueStyle={{ color: '#16a34a' }} />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #dc2626' }}>
+                  <Statistic title="Gastos + Costos" value={cierrePreview.totalGastoCosto as number} prefix="$" precision={2} valueStyle={{ color: '#dc2626' }} />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" style={{ borderRadius: 8, borderLeft: `3px solid ${(cierrePreview.superavitDeficit as number) >= 0 ? '#16a34a' : '#dc2626'}` }}>
+                  <Statistic
+                    title={(cierrePreview.superavitDeficit as number) >= 0 ? 'Superávit' : 'Déficit'}
+                    value={Math.abs(cierrePreview.superavitDeficit as number)} prefix="$" precision={2}
+                    valueStyle={{ color: (cierrePreview.superavitDeficit as number) >= 0 ? '#16a34a' : '#dc2626', fontWeight: 800 }} />
+                </Card>
+              </Col>
+            </Row>
+
+            <div style={{ marginBottom: 12, fontWeight: 600, fontSize: 13 }}>Cuentas de resultado a cerrar:</div>
+            <Table
+              dataSource={(cierrePreview.cuentasResultado as { codigo: string; nombre: string; tipo: string; saldo: number }[]) ?? []}
+              rowKey="codigo" size="small" pagination={false}
+              style={{ marginBottom: 16 }}
+              columns={[
+                { title: 'Código', dataIndex: 'codigo', width: 90 },
+                { title: 'Cuenta', dataIndex: 'nombre', ellipsis: true },
+                { title: 'Tipo', dataIndex: 'tipo', width: 90, render: (v: string) => <Tag color={TIPO_CUENTA_COLOR[v]}>{v}</Tag> },
+                { title: 'Saldo', dataIndex: 'saldo', align: 'right', width: 110, render: (v: number) => fmtUSD(v) },
+              ]}
+            />
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Cuenta destino del resultado (Patrimonio):</div>
+              <Select
+                style={{ width: '100%' }} showSearch placeholder="Seleccionar cuenta de patrimonio..."
+                value={cuentaPatrimonioId || undefined} onChange={setCuentaPatrimonioId}
+                filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
+                options={cuentasPatrimonio.map(c => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))}
+              />
+            </div>
+
+            <Alert type="warning" showIcon style={{ marginTop: 12, marginBottom: 16 }}
+              message="Esta acción generará un asiento de cierre publicado y cerrará todos los períodos del año. No se puede deshacer." />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button onClick={() => setModalCierre(false)}>Cancelar</Button>
+              <Button
+                type="primary" danger loading={savingCierre}
+                disabled={!(cierrePreview.puedeEjecutar as boolean)}
+                onClick={ejecutarCierre}
+              >
+                Ejecutar Cierre del Año {cierreAnio}
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       <Modal title="Nuevo período contable" open={modal} onCancel={() => setModal(false)} footer={null}>
         <Form form={form} layout="vertical" onFinish={onSave}>
@@ -761,12 +906,15 @@ function ReportesTab() {
   const [hasta, setHasta]   = useState(dayjs().endOf('year'));
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<Record<string, unknown> | null>(null);
-  const [cuentas, setCuentas]   = useState<Cuenta[]>([]);
+  const [cuentas, setCuentas]       = useState<Cuenta[]>([]);
+  const [cuentasTodas, setCuentasTodas] = useState<Cuenta[]>([]);
   const [accountId, setAccountId] = useState('');
 
   useEffect(() => {
     fetch('/api/contabilidad/cuentas?soloMovimiento=1')
       .then(r => r.json()).then(d => setCuentas(d.data ?? []));
+    fetch('/api/contabilidad/cuentas')
+      .then(r => r.json()).then(d => setCuentasTodas(d.data ?? []));
   }, []);
 
   async function generar() {
@@ -795,9 +943,11 @@ function ReportesTab() {
             <Select value={tipoReporte} onChange={setTipoReporte} style={{ width: '100%' }}
               options={[
                 { value: 'estado_actividades',  label: '📊 Estado de Actividades (ONG)' },
+                { value: 'balance_general',      label: '🏦 Balance General (Situación Financiera)' },
                 { value: 'balance_comprobacion', label: '⚖️  Balance de Comprobación' },
                 { value: 'libro_diario',         label: '📖 Libro Diario' },
                 { value: 'libro_mayor',          label: '📋 Libro Mayor' },
+                { value: 'libro_auxiliar',       label: '📂 Libro Auxiliar' },
               ]} />
           </Col>
           <Col span={4}>
@@ -810,11 +960,20 @@ function ReportesTab() {
           </Col>
           {tipoReporte === 'libro_mayor' && (
             <Col span={7}>
-              <div style={{ fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Cuenta</div>
+              <div style={{ fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Cuenta (con movimiento)</div>
               <Select showSearch style={{ width: '100%' }} placeholder="Seleccionar cuenta..."
                 value={accountId || undefined} onChange={setAccountId}
                 filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
                 options={cuentas.map(c => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))} />
+            </Col>
+          )}
+          {tipoReporte === 'libro_auxiliar' && (
+            <Col span={7}>
+              <div style={{ fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Cuenta agrupadora</div>
+              <Select showSearch style={{ width: '100%' }} placeholder="Seleccionar cuenta raíz..."
+                value={accountId || undefined} onChange={setAccountId}
+                filterOption={(input, opt) => (opt?.label as string ?? '').toLowerCase().includes(input.toLowerCase())}
+                options={cuentasTodas.map(c => ({ value: c.id, label: `${c.codigo} — ${c.nombre}` }))} />
             </Col>
           )}
           <Col>
@@ -832,6 +991,9 @@ function ReportesTab() {
         {resultado && tipoReporte === 'estado_actividades' && (
           <EstadoActividadesView data={resultado as EstadoActividadesData} />
         )}
+        {resultado && tipoReporte === 'balance_general' && (
+          <BalanceGeneralView data={resultado as BalanceGeneralData} />
+        )}
         {resultado && tipoReporte === 'balance_comprobacion' && (
           <BalanceComprobacionView data={resultado as BalanceCompData} />
         )}
@@ -840,6 +1002,9 @@ function ReportesTab() {
         )}
         {resultado && tipoReporte === 'libro_mayor' && (
           <LibroMayorView data={resultado as LibroMayorData} />
+        )}
+        {resultado && tipoReporte === 'libro_auxiliar' && (
+          <LibroAuxiliarView data={resultado as LibroAuxiliarData} />
         )}
       </Spin>
     </>
@@ -1007,6 +1172,25 @@ function LibroDiarioView({ data }: { data: LibroDiarioData }) {
   );
 }
 
+/* ─── Tipos de datos para nuevos reportes ────────────────────── */
+type LineaBG = { codigo: string; nombre: string; saldo: number; nivel: number };
+type BalanceGeneralData = {
+  activos: LineaBG[]; pasivos: LineaBG[]; patrimonios: LineaBG[];
+  totales: { totalActivo: number; totalPasivo: number; totalPatrimonio: number };
+  cuadra: boolean; hasta: string;
+};
+
+type AuxiliarSubcuenta = {
+  cuenta: { codigo: string; nombre: string; naturaleza: string };
+  movimientos: { fecha: string; numero: string; concepto: string; debe: number; haber: number; saldo: number }[];
+  totalDebe: number; totalHaber: number; saldoFinal: number;
+};
+type LibroAuxiliarData = {
+  cuentaRaiz: { codigo: string; nombre: string };
+  subcuentas: AuxiliarSubcuenta[];
+  totales: { totalDebe: number; totalHaber: number; saldoFinal: number };
+};
+
 type MayorMovimiento = { fecha: string; numero: number; concepto: string; debe: number; haber: number; saldo: number };
 type LibroMayorData  = { cuenta: { codigo: string; nombre: string; naturaleza: string }; movimientos: MayorMovimiento[]; saldoFinal: number; totalDebe: number; totalHaber: number };
 
@@ -1041,5 +1225,304 @@ function LibroMayorView({ data }: { data: LibroMayorData }) {
         )}
       />
     </div>
+  );
+}
+
+/* ─── Balance General ─────────────────────────────────────────── */
+function BalanceGeneralView({ data }: { data: BalanceGeneralData }) {
+  const { totales } = data;
+  const seccion = (titulo: string, lineas: LineaBG[], total: number, color: string) => (
+    <Card title={titulo} size="small" style={{ borderRadius: 8, borderTop: `3px solid ${color}` }}>
+      <Table
+        dataSource={lineas} rowKey="codigo" size="small" pagination={false}
+        columns={[
+          { title: 'Código', dataIndex: 'codigo', width: 90, render: (v: string) => <code style={{ fontSize: 11 }}>{v}</code> },
+          { title: 'Cuenta', dataIndex: 'nombre', ellipsis: true,
+            render: (v: string, r: LineaBG) => <span style={{ paddingLeft: (r.nivel - 1) * 12 }}>{v}</span> },
+          { title: 'Saldo', dataIndex: 'saldo', align: 'right', width: 120,
+            render: (v: number) => <b style={{ color }}>{fmtUSD(v)}</b> },
+        ]}
+        summary={() => (
+          <Table.Summary.Row style={{ fontWeight: 700 }}>
+            <Table.Summary.Cell index={0} colSpan={2}>TOTAL {titulo.toUpperCase()}</Table.Summary.Cell>
+            <Table.Summary.Cell index={2} align="right"><span style={{ color }}>{fmtUSD(total)}</span></Table.Summary.Cell>
+          </Table.Summary.Row>
+        )}
+      />
+    </Card>
+  );
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>FUNDACIÓN ASISTEDCOS EL SALVADOR</div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>BALANCE GENERAL — ESTADO DE SITUACIÓN FINANCIERA</div>
+        <div style={{ color: 'hsl(var(--text-muted))', fontSize: 12 }}>
+          Al {dayjs(data.hasta).format('DD/MM/YYYY')}
+        </div>
+        <div style={{ marginTop: 8 }}>
+          {data.cuadra
+            ? <Tag color="success">✓ Activo = Pasivo + Patrimonio</Tag>
+            : <Tag color="error">⚠ No cuadra — revise el catálogo de cuentas</Tag>}
+        </div>
+      </div>
+
+      <Row gutter={12} style={{ marginBottom: 16 }}>
+        <Col span={8}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #2563eb' }}>
+            <Statistic title="Total Activo" value={totales.totalActivo} prefix="$" precision={2} valueStyle={{ color: '#2563eb' }} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #dc2626' }}>
+            <Statistic title="Total Pasivo" value={totales.totalPasivo} prefix="$" precision={2} valueStyle={{ color: '#dc2626' }} />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small" style={{ borderRadius: 8, borderLeft: '3px solid #7c3aed' }}>
+            <Statistic title="Patrimonio" value={totales.totalPatrimonio} prefix="$" precision={2} valueStyle={{ color: '#7c3aed' }} />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={16}>
+        <Col span={12}>
+          {seccion('Activo', data.activos, totales.totalActivo, '#2563eb')}
+        </Col>
+        <Col span={12}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {seccion('Pasivo', data.pasivos, totales.totalPasivo, '#dc2626')}
+            {seccion('Patrimonio', data.patrimonios, totales.totalPatrimonio, '#7c3aed')}
+          </div>
+        </Col>
+      </Row>
+
+      <Card size="small" style={{ marginTop: 12, borderRadius: 8, textAlign: 'right', background: '#f8f8ff' }}>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>
+          PASIVO + PATRIMONIO: {fmtUSD(totales.totalPasivo + totales.totalPatrimonio)}
+        </span>
+      </Card>
+    </div>
+  );
+}
+
+/* ─── Libro Auxiliar ─────────────────────────────────────────── */
+function LibroAuxiliarView({ data }: { data: LibroAuxiliarData }) {
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>
+          LIBRO AUXILIAR — <code>{data.cuentaRaiz.codigo}</code> {data.cuentaRaiz.nombre}
+        </div>
+        <div style={{ color: 'hsl(var(--text-muted))', fontSize: 12 }}>
+          {data.subcuentas.length} subcuenta(s) con movimientos
+        </div>
+      </div>
+
+      {data.subcuentas.length === 0 && (
+        <Empty description="No hay movimientos en las subcuentas de esta cuenta para el período seleccionado" />
+      )}
+
+      {data.subcuentas.map((sub) => (
+        <Card
+          key={sub.cuenta.codigo}
+          size="small"
+          style={{ marginBottom: 12, borderRadius: 8 }}
+          title={
+            <span>
+              <code style={{ fontSize: 12 }}>{sub.cuenta.codigo}</code>{' '}
+              {sub.cuenta.nombre}{' '}
+              <Tag color={sub.cuenta.naturaleza === 'DEUDORA' ? 'blue' : 'orange'} style={{ marginLeft: 8 }}>
+                {sub.cuenta.naturaleza}
+              </Tag>
+            </span>
+          }
+          extra={
+            <span style={{ fontSize: 12 }}>
+              Saldo: <b style={{ color: sub.saldoFinal >= 0 ? '#16a34a' : '#dc2626' }}>{fmtUSD(Math.abs(sub.saldoFinal))}</b>
+            </span>
+          }
+        >
+          <Table
+            dataSource={sub.movimientos} rowKey={(_, i) => String(i)}
+            size="small" pagination={false}
+            columns={[
+              { title: 'Fecha',    dataIndex: 'fecha',   width: 100, render: (v: string) => dayjs(v).format('DD/MM/YYYY') },
+              { title: 'N°',       dataIndex: 'numero',  width: 90 },
+              { title: 'Concepto', dataIndex: 'concepto', ellipsis: true },
+              { title: 'Desc.',    dataIndex: 'descripcion', width: 120, render: (v: string) => v ?? '—' },
+              { title: 'Debe',     dataIndex: 'debe',   align: 'right', width: 100, render: (v: number) => v ? fmtUSD(v) : '—' },
+              { title: 'Haber',    dataIndex: 'haber',  align: 'right', width: 100, render: (v: number) => v ? fmtUSD(v) : '—' },
+              { title: 'Saldo',    dataIndex: 'saldo',  align: 'right', width: 110,
+                render: (v: number) => <b style={{ color: v >= 0 ? '#16a34a' : '#dc2626' }}>{fmtUSD(Math.abs(v))}</b> },
+            ]}
+            summary={() => (
+              <Table.Summary.Row style={{ fontWeight: 600 }}>
+                <Table.Summary.Cell index={0} colSpan={4}>Subtotal</Table.Summary.Cell>
+                <Table.Summary.Cell index={4} align="right">{fmtUSD(sub.totalDebe)}</Table.Summary.Cell>
+                <Table.Summary.Cell index={5} align="right">{fmtUSD(sub.totalHaber)}</Table.Summary.Cell>
+                <Table.Summary.Cell index={6} align="right">
+                  <b style={{ color: sub.saldoFinal >= 0 ? '#16a34a' : '#dc2626' }}>{fmtUSD(Math.abs(sub.saldoFinal))}</b>
+                </Table.Summary.Cell>
+              </Table.Summary.Row>
+            )}
+          />
+        </Card>
+      ))}
+
+      {data.subcuentas.length > 0 && (
+        <Card size="small" style={{ borderRadius: 8, textAlign: 'right', background: 'hsl(var(--bg-page))' }}>
+          <span style={{ fontWeight: 700 }}>
+            TOTAL DEBE: {fmtUSD(data.totales.totalDebe)} &nbsp;|&nbsp;
+            TOTAL HABER: {fmtUSD(data.totales.totalHaber)} &nbsp;|&nbsp;
+            SALDO NETO: <span style={{ color: data.totales.saldoFinal >= 0 ? '#16a34a' : '#dc2626' }}>
+              {fmtUSD(Math.abs(data.totales.saldoFinal))}
+            </span>
+          </span>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TAB: TIPOS DE PARTIDA (CRUD)
+   ═══════════════════════════════════════════════════════════ */
+function TiposPartidaTab() {
+  const [data, setData]       = useState<TipoPartida[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [modal, setModal]     = useState(false);
+  const [editing, setEditing] = useState<TipoPartida | null>(null);
+  const [saving, setSaving]   = useState(false);
+  const [form]                = Form.useForm();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/contabilidad/tipos-partida');
+      const d = await r.json();
+      setData(d.data ?? []);
+    } catch { toast.error('Error cargando tipos de partida'); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  function openNew() {
+    setEditing(null);
+    form.resetFields();
+    setModal(true);
+  }
+
+  function openEdit(t: TipoPartida) {
+    setEditing(t);
+    form.setFieldsValue({ nombre: t.nombre, descripcion: t.descripcion, activo: t.activo, orden: t.orden });
+    setModal(true);
+  }
+
+  async function onSave() {
+    try {
+      const vals = await form.validateFields();
+      setSaving(true);
+      const url    = editing ? `/api/contabilidad/tipos-partida/${editing.id}` : '/api/contabilidad/tipos-partida';
+      const method = editing ? 'PUT' : 'POST';
+      const body   = editing
+        ? { nombre: vals.nombre, descripcion: vals.descripcion, activo: vals.activo, orden: vals.orden }
+        : { codigo: vals.codigo, nombre: vals.nombre, descripcion: vals.descripcion, orden: vals.orden };
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? 'Error'); }
+      toast.success(editing ? 'Tipo actualizado' : 'Tipo creado');
+      setModal(false); load();
+    } catch (e: unknown) {
+      if (e instanceof Error) toast.error(e.message);
+    } finally { setSaving(false); }
+  }
+
+  async function eliminar(t: TipoPartida) {
+    try {
+      const r = await fetch(`/api/contabilidad/tipos-partida/${t.id}`, { method: 'DELETE' });
+      if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? 'Error'); }
+      toast.success('Tipo eliminado');
+      load();
+    } catch (e: unknown) {
+      if (e instanceof Error) toast.error(e.message);
+    }
+  }
+
+  const cols: ColumnsType<TipoPartida> = [
+    { title: 'Código', dataIndex: 'codigo', width: 130,
+      render: v => <Tag style={{ fontFamily: 'monospace', fontWeight: 700 }}>{v}</Tag> },
+    { title: 'Nombre', dataIndex: 'nombre', ellipsis: true },
+    { title: 'Descripción', dataIndex: 'descripcion', ellipsis: true, render: v => v ?? '—' },
+    { title: 'Orden', dataIndex: 'orden', width: 70, align: 'center' },
+    { title: 'Estado', dataIndex: 'activo', width: 90, align: 'center',
+      render: v => <Badge status={v ? 'success' : 'default'} text={v ? 'Activo' : 'Inactivo'} /> },
+    { title: 'Acciones', key: 'acc', width: 100, align: 'right',
+      render: (_, r) => (
+        <Space size={4}>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openEdit(r)} />
+          <Popconfirm title="¿Eliminar este tipo? Solo se puede si no tiene asientos asociados." onConfirm={() => eliminar(r)}>
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <Alert
+        type="info" showIcon style={{ marginBottom: 16 }}
+        message="Los tipos de partida definen la naturaleza de cada asiento contable. Se usan en el formulario de asientos."
+      />
+
+      <Row justify="end" style={{ marginBottom: 12 }}>
+        <Button type="primary" icon={<Plus size={14} />} onClick={openNew}>
+          Nuevo tipo
+        </Button>
+      </Row>
+
+      <Table dataSource={data} columns={cols} rowKey="id" loading={loading} size="small" pagination={false} />
+
+      <Modal
+        title={editing ? 'Editar tipo de partida' : 'Nuevo tipo de partida'}
+        open={modal} onCancel={() => setModal(false)} footer={null}
+      >
+        <Form form={form} layout="vertical" onFinish={onSave}>
+          {!editing && (
+            <Form.Item name="codigo" label="Código" rules={[{ required: true, message: 'Requerido' }]}
+              extra="Ej: DIARIO, AJUSTE, VENTA, COMPRA, DEPRECIACION. Se guardará en MAYÚSCULAS.">
+              <Input maxLength={30} placeholder="Ej: DEPRECIACION" style={{ textTransform: 'uppercase' }} />
+            </Form.Item>
+          )}
+          <Form.Item name="nombre" label="Nombre descriptivo" rules={[{ required: true }]}>
+            <Input maxLength={100} placeholder="Ej: Depreciación de activos" />
+          </Form.Item>
+          <Form.Item name="descripcion" label="Descripción (opcional)">
+            <Input.TextArea rows={2} maxLength={300} />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="orden" label="Orden en lista" initialValue={0}>
+                <InputNumber min={0} max={999} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            {editing && (
+              <Col span={12}>
+                <Form.Item name="activo" label="Estado" initialValue={true}>
+                  <Select options={[{ value: true, label: 'Activo' }, { value: false, label: 'Inactivo' }]} />
+                </Form.Item>
+              </Col>
+            )}
+          </Row>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={() => setModal(false)}>Cancelar</Button>
+            <Button type="primary" htmlType="submit" loading={saving}>
+              {editing ? 'Guardar' : 'Crear tipo'}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+    </>
   );
 }

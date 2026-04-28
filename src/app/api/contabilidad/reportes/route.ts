@@ -23,8 +23,10 @@ export async function GET(req: NextRequest) {
     switch (tipo) {
       case 'balance_comprobacion': return ok(await balanceComprobacion(fechaDesde, fechaHasta));
       case 'libro_mayor':         return ok(await libroMayor(accountId, fechaDesde, fechaHasta));
+      case 'libro_auxiliar':      return ok(await libroAuxiliar(accountId, fechaDesde, fechaHasta));
       case 'libro_diario':        return ok(await libroDiario(fechaDesde, fechaHasta));
       case 'estado_actividades':  return ok(await estadoActividades(fechaDesde, fechaHasta));
+      case 'balance_general':     return ok(await balanceGeneral(fechaDesde, fechaHasta));
       default: return apiError('Tipo de reporte no válido', 400);
     }
   } catch (e) { return apiError(e); }
@@ -238,5 +240,188 @@ async function estadoActividades(desde: Date, hasta: Date) {
       superavitDeficit:    superavit,
       esSupervit:          superavit >= 0,
     },
+  };
+}
+
+/* ── Libro Auxiliar ─────────────────────────────────────────────── */
+// Muestra una cuenta agrupadora con todos sus movimientos por subcuenta
+async function libroAuxiliar(accountId: string, desde: Date, hasta: Date) {
+  if (!accountId) throw new Error('accountId requerido para libro auxiliar');
+
+  // Cargar la cuenta raíz y todos sus descendientes
+  const cuentaRaiz = await prisma.accountChart.findUniqueOrThrow({
+    where: { id: accountId },
+    select: { id: true, codigo: true, nombre: true, tipo: true, naturaleza: true, nivel: true },
+  });
+
+  // Obtener todos los descendientes (hijos, nietos, etc.) usando la jerarquía
+  const todasLasCuentas = await prisma.accountChart.findMany({
+    where: { activa: true },
+    select: { id: true, codigo: true, nombre: true, tipo: true, naturaleza: true, nivel: true, parentId: true, permiteMovimiento: true },
+    orderBy: { codigo: 'asc' },
+  });
+
+  // Construir árbol y obtener IDs descendientes de la cuenta raíz
+  function getDescendantIds(rootId: string): string[] {
+    const ids: string[] = [rootId];
+    const hijos = todasLasCuentas.filter(c => c.parentId === rootId);
+    for (const hijo of hijos) ids.push(...getDescendantIds(hijo.id));
+    return ids;
+  }
+  const descendantIds = getDescendantIds(accountId);
+  const cuentasMovimiento = todasLasCuentas.filter(
+    c => descendantIds.includes(c.id) && c.permiteMovimiento,
+  );
+
+  // Obtener movimientos para cada subcuenta
+  const subcuentas = await Promise.all(
+    cuentasMovimiento.map(async (cuenta) => {
+      const lines = await prisma.journalLine.findMany({
+        where: {
+          accountId: cuenta.id,
+          entry: { fecha: { gte: desde, lte: hasta }, estado: 'PUBLICADO' },
+        },
+        include: {
+          entry: { select: { numero: true, anio: true, fecha: true, concepto: true, tipo: true } },
+        },
+        orderBy: { entry: { fecha: 'asc' } },
+      });
+
+      let saldo = 0;
+      const movimientos = lines.map(l => {
+        const debe  = Number(l.debe);
+        const haber = Number(l.haber);
+        saldo += cuenta.naturaleza === 'DEUDORA' ? debe - haber : haber - debe;
+        return {
+          fecha:       l.entry.fecha,
+          numero:      `${l.entry.anio}-${String(l.entry.numero).padStart(4, '0')}`,
+          concepto:    l.entry.concepto,
+          tipo:        l.entry.tipo,
+          descripcion: l.descripcion,
+          debe, haber,
+          saldo,
+        };
+      });
+
+      return {
+        cuenta:     { id: cuenta.id, codigo: cuenta.codigo, nombre: cuenta.nombre, naturaleza: cuenta.naturaleza },
+        movimientos,
+        totalDebe:  lines.reduce((s, l) => s + Number(l.debe),  0),
+        totalHaber: lines.reduce((s, l) => s + Number(l.haber), 0),
+        saldoFinal: saldo,
+      };
+    }),
+  );
+
+  const subcuentasConMovimientos = subcuentas.filter(s => s.movimientos.length > 0);
+
+  return {
+    tipo:       'libro_auxiliar',
+    cuentaRaiz,
+    desde, hasta,
+    subcuentas: subcuentasConMovimientos,
+    totales: {
+      totalDebe:  subcuentasConMovimientos.reduce((s, c) => s + c.totalDebe,  0),
+      totalHaber: subcuentasConMovimientos.reduce((s, c) => s + c.totalHaber, 0),
+      saldoFinal: subcuentasConMovimientos.reduce((s, c) => s + c.saldoFinal, 0),
+    },
+  };
+}
+
+/* ── Balance General ─────────────────────────────────────────────── */
+// Estado de Situación Financiera ONG: Activo = Pasivo + Patrimonio
+async function balanceGeneral(desde: Date, hasta: Date) {
+  // Obtener todos los movimientos publicados hasta la fecha "hasta"
+  const lines = await prisma.journalLine.findMany({
+    where: {
+      entry: { fecha: { lte: hasta }, estado: 'PUBLICADO' },
+      account: {
+        tipo:             { in: ['ACTIVO', 'PASIVO', 'PATRIMONIO'] },
+        permiteMovimiento: true,
+      },
+    },
+    include: {
+      account: {
+        select: { id: true, codigo: true, nombre: true, tipo: true, naturaleza: true, nivel: true, parentId: true },
+      },
+    },
+  });
+
+  // Agrupar por cuenta
+  const map = new Map<string, { account: typeof lines[0]['account']; debe: number; haber: number }>();
+  for (const l of lines) {
+    const k = l.accountId;
+    if (!map.has(k)) map.set(k, { account: l.account, debe: 0, haber: 0 });
+    const e = map.get(k)!;
+    e.debe  += Number(l.debe);
+    e.haber += Number(l.haber);
+  }
+
+  // Calcular saldo según naturaleza
+  const calcSaldo = (naturaleza: string, debe: number, haber: number) =>
+    naturaleza === 'DEUDORA' ? debe - haber : haber - debe;
+
+  type LineaBG = { codigo: string; nombre: string; saldo: number; nivel: number };
+
+  const activos:     LineaBG[] = [];
+  const pasivos:     LineaBG[] = [];
+  const patrimonios: LineaBG[] = [];
+
+  for (const { account, debe, haber } of map.values()) {
+    const saldo = calcSaldo(account.naturaleza, debe, haber);
+    if (Math.abs(saldo) < 0.001) continue;
+
+    const linea: LineaBG = { codigo: account.codigo, nombre: account.nombre, saldo, nivel: account.nivel };
+    if      (account.tipo === 'ACTIVO')     activos.push(linea);
+    else if (account.tipo === 'PASIVO')     pasivos.push(linea);
+    else if (account.tipo === 'PATRIMONIO') patrimonios.push(linea);
+  }
+
+  // Agregar superávit/déficit acumulado (cuentas de resultado)
+  const linesResultado = await prisma.journalLine.findMany({
+    where: {
+      entry: { fecha: { lte: hasta }, estado: 'PUBLICADO' },
+      account: { tipo: { in: ['INGRESO', 'GASTO', 'COSTO'] }, permiteMovimiento: true },
+    },
+    include: {
+      account: { select: { tipo: true, naturaleza: true } },
+    },
+  });
+
+  let resultadoAcumulado = 0;
+  for (const l of linesResultado) {
+    const debe  = Number(l.debe);
+    const haber = Number(l.haber);
+    resultadoAcumulado += l.account.tipo === 'INGRESO'
+      ? haber - debe   // ingreso: saldo acreedor
+      : debe  - haber; // gasto/costo: negativo
+  }
+
+  if (Math.abs(resultadoAcumulado) > 0.01) {
+    patrimonios.push({
+      codigo: '—',
+      nombre: resultadoAcumulado >= 0 ? 'Superávit/Déficit del Período' : 'Déficit del Período',
+      saldo:  resultadoAcumulado,
+      nivel:  4,
+    });
+  }
+
+  activos.sort((a, b)     => a.codigo.localeCompare(b.codigo));
+  pasivos.sort((a, b)     => a.codigo.localeCompare(b.codigo));
+  patrimonios.sort((a, b) => a.codigo.localeCompare(b.codigo));
+
+  const totalActivo     = activos.reduce((s, l) => s + l.saldo, 0);
+  const totalPasivo     = pasivos.reduce((s, l) => s + l.saldo, 0);
+  const totalPatrimonio = patrimonios.reduce((s, l) => s + l.saldo, 0);
+  const cuadra          = Math.abs(totalActivo - (totalPasivo + totalPatrimonio)) < 0.05;
+
+  return {
+    tipo: 'balance_general',
+    hasta,
+    activos,
+    pasivos,
+    patrimonios,
+    totales: { totalActivo, totalPasivo, totalPatrimonio },
+    cuadra,
   };
 }
