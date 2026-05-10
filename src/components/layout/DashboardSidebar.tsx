@@ -38,6 +38,7 @@ import {
   Notebook,
   CalendarBlank,
   TreeStructure,
+  ShieldCheck,
 } from '@phosphor-icons/react';
 
 /* ─── Tipos ─────────────────────────────────────────────── */
@@ -79,6 +80,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/contabilidad?tab=periodos', label: 'Períodos',        icon: <CalendarBlank size={18} weight="duotone" />, section: 'Contabilidad' },
   { href: '/contabilidad?tab=reportes', label: 'Reportes',        icon: <BookOpen size={18} weight="duotone" />,      section: 'Contabilidad' },
 
+  /* Cumplimiento */
+  { href: '/cumplimiento',             label: 'Cumplimiento AML', icon: <ShieldCheck size={18} weight="duotone" />,   section: 'Cumplimiento' },
+
   /* Administración */
   { href: '/actas',               label: 'Actas',           icon: <FileText size={18} weight="duotone" />,       section: 'Administración' },
   { href: '/reportes',            label: 'Reportes',        icon: <ChartBar size={18} weight="duotone" />,       section: 'Administración' },
@@ -87,7 +91,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 /* Orden de secciones */
-const SECTION_ORDER = ['Gestión ONG', 'Financiero', 'Fiscal', 'Contabilidad', 'Administración'];
+const SECTION_ORDER = ['Gestión ONG', 'Financiero', 'Fiscal', 'Contabilidad', 'Cumplimiento', 'Administración'];
 
 /* ─── Componente ─────────────────────────────────────────── */
 export default function DashboardSidebar() {

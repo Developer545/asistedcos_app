@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { created, apiError, paginate, parsePagination } from '@/lib/response';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
 import { asientoDonacion } from '@/lib/contabilidad/auto-asientos';
+import { triggerAmlDonacion } from '@/lib/cumplimiento/aml-alertas';
 
 export async function GET(req: NextRequest) {
   try {
@@ -61,8 +62,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Auto-asiento contable de la donación
+    // Auto-asiento contable + alertas AML (fire-and-forget)
     asientoDonacion(donation.id);
+    triggerAmlDonacion(donation.id);
 
     return created(donation);
   } catch (err) { return apiError(err); }

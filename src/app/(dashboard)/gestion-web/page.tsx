@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
-  Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
+  Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider, DatePicker,
   InputNumber, Spin, Progress, Select, Image, Tooltip, Empty,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -283,8 +283,13 @@ export default function GestionWebPage() {
       const r = await fetch('/api/gestion-web/contenido');
       const d = await r.json();
       setContent(d.data ?? []);
-      const vals: Record<string, string> = {};
-      (d.data ?? []).forEach((c: WebContent) => { vals[`${c.section}__${c.key}`] = c.value; });
+      const vals: Record<string, unknown> = {};
+      (d.data ?? []).forEach((c: WebContent) => {
+        const formKey = `${c.section}__${c.key}`;
+        if (formKey === 'campaign__active') vals[formKey] = c.value === 'true';
+        else if (formKey === 'campaign__endsAt') vals[formKey] = c.value ? dayjs(c.value) : null;
+        else vals[formKey] = c.value;
+      });
       contentForm.setFieldsValue(vals);
     } catch { toast.error('Error cargando contenido'); }
     finally { setContentLoading(false); }
@@ -379,17 +384,23 @@ export default function GestionWebPage() {
   }
 
   /* ── Content CRUD ─────────────────────────────────── */
-  async function saveContent(vals: Record<string, string>) {
+  async function saveContent(vals: Record<string, unknown>) {
     setContentSaving(true);
     try {
-      const IMAGE_KEYS = ['hero__imagen', 'about__imagen'];
+      const IMAGE_KEYS = ['hero__imagen', 'about__imagen', 'campaign__image'];
       const entries = Object.entries(vals)
         .filter(([, value]) => value !== undefined && value !== null)
         .map(([key, value]) => {
           const [section, ...rest] = key.split('__');
           const fieldKey = rest.join('__');
           const type = IMAGE_KEYS.includes(key) ? 'image' : 'text';
-          return { section, key: fieldKey, value: value ?? '', type };
+          const normalizedValue =
+            typeof value === 'boolean'
+              ? String(value)
+              : dayjs.isDayjs(value)
+                ? value.toISOString()
+                : String(value ?? '');
+          return { section, key: fieldKey, value: normalizedValue, type };
         });
       const r = await fetch('/api/gestion-web/contenido', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -750,6 +761,95 @@ export default function GestionWebPage() {
             <Form.Item name="about__imagen" label="Imagen de la sección Nosotros/Misión">
               <CloudinaryUpload folder="asistedcos/about" aspectHint="4:3 — 800×600 recomendado" />
             </Form.Item>
+            <Divider>Campaña destacada</Divider>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Aquí ajustas la campaña principal del home y de la página de donar. Puedes cambiarla cada semana o mes sin tocar código."
+            />
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__active" label="Campaña activa" valuePropName="checked">
+                  <Switch />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={16}>
+                <Form.Item name="campaign__slug" label="Slug de campaña (ej: mangles-1m)">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__badge" label="Fecha corta / badge superior">
+                  <Input placeholder="26 mayo 2026" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__title" label="Título principal de campaña">
+                  <Input.TextArea rows={3} placeholder="Siembra de 1 Millón de mangles" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__description" label="Descripción de campaña">
+                  <Input.TextArea rows={4} />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__image" label="Imagen principal de campaña">
+                  <CloudinaryUpload folder="asistedcos/campanas" aspectHint="16:9 — 1920×1080 recomendado" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__goalLabel" label="Meta destacada">
+                  <Input placeholder="1 Millón" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__goalFigure" label="Meta numérica secundaria">
+                  <Input placeholder="1,000,000" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__unitLabel" label="Unidad / subtítulo de meta">
+                  <Input placeholder="mangles nativos" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__progressPercent" label="Porcentaje de avance">
+                  <InputNumber min={0} max={100} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__impactLabel" label="Etiqueta del avance">
+                  <Input placeholder="Impulso inicial" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__suggestedAmount" label="Monto sugerido (USD)">
+                  <InputNumber min={1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__amounts" label="Montos sugeridos">
+                  <Input placeholder="10,25,50,100,250" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__endsAt" label="Fecha y hora fin de campaña">
+                  <DatePicker
+                    showTime
+                    format="DD/MM/YYYY HH:mm"
+                    style={{ width: '100%' }}
+                    placeholder="Selecciona fecha final"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__volunteerUrl" label="URL botón participar">
+                  <Input placeholder="/contacto?campania=mangles-1m" />
+                </Form.Item>
+              </Col>
+            </Row>
             <Button type="primary" htmlType="submit" loading={contentSaving}>Guardar contenido</Button>
           </Form>
         </Spin>
@@ -773,6 +873,7 @@ export default function GestionWebPage() {
               <Select.Option value="asistedcos/hero">asistedcos/hero</Select.Option>
               <Select.Option value="asistedcos/about">asistedcos/about</Select.Option>
               <Select.Option value="asistedcos/aliados">asistedcos/aliados</Select.Option>
+              <Select.Option value="asistedcos/campanas">asistedcos/campanas</Select.Option>
               <Select.Option value="asistedcos/ong">asistedcos/ong</Select.Option>
             </Select>
             <Input
