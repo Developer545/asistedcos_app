@@ -194,10 +194,12 @@ type WebContent = { id: string; section: string; key: string; value: string; typ
 type GalleryItem = { id: string; title?: string; url: string; category?: string; order: number; createdAt: string };
 type Cause = {
   id: string; titulo: string; descripcion?: string; tag?: string;
-  coverImage?: string; meta: number; recaudado: number; active: boolean; order: number;
+  coverImage?: string; ubicacion?: string; estado: string;
+  meta: number; recaudado: number; active: boolean; order: number;
 };
 type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
 type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
+type Testimonial = { id: string; quote: string; name: string; role: string; initials: string; photo?: string; active: boolean; order: number };
 
 function slugify(text: string) {
   return text.toLowerCase()
@@ -259,6 +261,14 @@ export default function GestionWebPage() {
 
   /* ── Deploy ─────────────────────────────────── */
   const [deploying, setDeploying] = useState(false);
+
+  /* ── Testimonios ─────────────────────────────────── */
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonialsLoading, setTestimonialsLoading] = useState(false);
+  const [testimonialsModal, setTestimonialsModal] = useState(false);
+  const [testimonialEditing, setTestimonialEditing] = useState<Testimonial | null>(null);
+  const [testimonialsSaving, setTestimonialsSaving] = useState(false);
+  const [testimonialsForm] = Form.useForm();
 
   /* ── Biblioteca ─────────────────────────────────── */
   const [biblioteca, setBiblioteca] = useState<{ publicId: string; url: string; fullUrl: string; bytes: number; folder: string; createdAt: string }[]>([]);
@@ -335,6 +345,16 @@ export default function GestionWebPage() {
     finally { setPartnersLoading(false); }
   }, []);
 
+  const loadTestimonials = useCallback(async () => {
+    setTestimonialsLoading(true);
+    try {
+      const r = await fetch('/api/gestion-web/testimonios');
+      const d = await r.json();
+      setTestimonials(d.data ?? []);
+    } catch { toast.error('Error cargando testimonios'); }
+    finally { setTestimonialsLoading(false); }
+  }, []);
+
   const loadBiblioteca = useCallback(async () => {
     setBibLoading(true);
     try {
@@ -351,6 +371,7 @@ export default function GestionWebPage() {
   useEffect(() => { if (tab === 'causas') loadCauses(); }, [tab, loadCauses]);
   useEffect(() => { if (tab === 'faq') loadFaq(); }, [tab, loadFaq]);
   useEffect(() => { if (tab === 'aliados') loadPartners(); }, [tab, loadPartners]);
+  useEffect(() => { if (tab === 'testimonios') loadTestimonials(); }, [tab, loadTestimonials]);
   useEffect(() => { if (tab === 'biblioteca') loadBiblioteca(); }, [tab, bibFolder, loadBiblioteca]);
 
   /* ── News CRUD ─────────────────────────────────── */
@@ -532,6 +553,36 @@ export default function GestionWebPage() {
     } catch { toast.error('Error eliminando'); }
   }
 
+  /* ── Testimonials CRUD ─────────────────────────────────── */
+  function openTestimonialsModal(item?: Testimonial) {
+    setTestimonialEditing(item ?? null);
+    testimonialsForm.resetFields();
+    if (item) testimonialsForm.setFieldsValue(item);
+    setTestimonialsModal(true);
+  }
+
+  async function saveTestimonial(vals: Record<string, unknown>) {
+    setTestimonialsSaving(true);
+    try {
+      const url = testimonialEditing ? `/api/gestion-web/testimonios/${testimonialEditing.id}` : '/api/gestion-web/testimonios';
+      const method = testimonialEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error((await r.json()).error ?? 'Error');
+      toast.success(testimonialEditing ? 'Testimonio actualizado' : 'Testimonio creado');
+      setTestimonialsModal(false);
+      loadTestimonials();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setTestimonialsSaving(false); }
+  }
+
+  async function deleteTestimonial(id: string) {
+    try {
+      await fetch(`/api/gestion-web/testimonios/${id}`, { method: 'DELETE' });
+      toast.success('Testimonio eliminado');
+      loadTestimonials();
+    } catch { toast.error('Error eliminando'); }
+  }
+
   /* ── Deploy ─────────────────────────────────── */
   async function triggerDeploy() {
     setDeploying(true);
@@ -621,6 +672,28 @@ export default function GestionWebPage() {
         <Space>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openFaqModal(r)} />
           <Popconfirm title="¿Eliminar pregunta?" onConfirm={() => deleteFaq(r.id)} okText="Sí" cancelText="No">
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const testimonialsCols: ColumnsType<Testimonial> = [
+    {
+      title: '', key: 'avatar', width: 52, render: (_, r) => r.photo
+        ? <img src={r.photo} alt={r.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>{r.initials || '?'}</div>
+    },
+    { title: 'Nombre', dataIndex: 'name', key: 'name', width: 150 },
+    { title: 'Cargo / Rol', dataIndex: 'role', key: 'role', width: 160, ellipsis: true },
+    { title: 'Testimonio', dataIndex: 'quote', key: 'quote', ellipsis: true },
+    { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openTestimonialsModal(r)} />
+          <Popconfirm title="¿Eliminar testimonio?" onConfirm={() => deleteTestimonial(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
           </Popconfirm>
         </Space>
@@ -728,6 +801,19 @@ export default function GestionWebPage() {
             <Button type="primary" icon={<Plus size={14} />} onClick={() => openPartnersModal()}>Nuevo aliado</Button>
           </div>
           <Table dataSource={partners} columns={partnersCols} rowKey="id" loading={partnersLoading} size="small" pagination={false} />
+        </div>
+      ),
+    },
+    {
+      key: 'testimonios', label: 'Testimonios',
+      children: (
+        <div>
+          <Alert type="info" showIcon style={{ marginBottom: 16 }}
+            message="Los testimonios aparecen en la sección de testimonios del sitio público. Recomendado: 3-6 testimonios activos." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openTestimonialsModal()}>Nuevo testimonio</Button>
+          </div>
+          <Table dataSource={testimonials} columns={testimonialsCols} rowKey="id" loading={testimonialsLoading} size="small" pagination={false} />
         </div>
       ),
     },
@@ -1043,6 +1129,9 @@ export default function GestionWebPage() {
           <Form.Item name="descripcion" label="Descripción">
             <Input.TextArea rows={3} />
           </Form.Item>
+          <Form.Item name="ubicacion" label="Ubicación (ej: Playa San Diego, La Libertad)">
+            <Input />
+          </Form.Item>
           <Form.Item name="coverImage" label="Imagen">
             <CloudinaryUpload folder="asistedcos/causas" aspectHint="4:3 recomendado" />
           </Form.Item>
@@ -1057,13 +1146,24 @@ export default function GestionWebPage() {
                 <InputNumber min={0} step={100} prefix="$" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col span={8}>
+              <Form.Item name="estado" label="Estado" initialValue="Activo">
+                <Select>
+                  <Select.Option value="Activo">Activo</Select.Option>
+                  <Select.Option value="Continuo">Continuo</Select.Option>
+                  <Select.Option value="Completado">Completado</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}>
               <Form.Item name="order" label="Orden">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={4}>
-              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+            <Col span={8}>
+              <Form.Item name="active" label="Publicado" valuePropName="checked" initialValue={true}>
                 <Switch />
               </Form.Item>
             </Col>
@@ -1113,6 +1213,53 @@ export default function GestionWebPage() {
           </Form.Item>
           <Form.Item name="answer" label="Respuesta" rules={[{ required: true }]}>
             <Input.TextArea rows={4} />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="order" label="Orden" initialValue={0}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Testimonials Modal */}
+      <Modal
+        title={testimonialEditing ? 'Editar testimonio' : 'Nuevo testimonio'}
+        open={testimonialsModal}
+        onCancel={() => setTestimonialsModal(false)}
+        onOk={() => testimonialsForm.submit()}
+        confirmLoading={testimonialsSaving}
+        width={560}
+        okText={testimonialEditing ? 'Actualizar' : 'Crear'}
+      >
+        <Form form={testimonialsForm} layout="vertical" onFinish={saveTestimonial}>
+          <Form.Item name="quote" label="Testimonio" rules={[{ required: true, message: 'El testimonio es requerido' }]}>
+            <Input.TextArea rows={3} placeholder="Escribe el testimonio aquí..." />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={14}>
+              <Form.Item name="name" label="Nombre completo" rules={[{ required: true }]}>
+                <Input placeholder="María López" />
+              </Form.Item>
+            </Col>
+            <Col span={10}>
+              <Form.Item name="initials" label="Iniciales (avatar)" rules={[{ required: true }]}>
+                <Input placeholder="ML" maxLength={3} style={{ textTransform: 'uppercase' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="role" label="Cargo / Rol" rules={[{ required: true }]}>
+            <Input placeholder="Pescadora, La Libertad" />
+          </Form.Item>
+          <Form.Item name="photo" label="Foto de perfil (opcional — reemplaza las iniciales)">
+            <CloudinaryUpload folder="asistedcos/testimonios" aspectHint="1:1 cuadrada recomendado" />
           </Form.Item>
           <Row gutter={12}>
             <Col span={8}>
