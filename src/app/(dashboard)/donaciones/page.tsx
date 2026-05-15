@@ -137,10 +137,18 @@ export default function DonacionesPage() {
       const url     = dEditing ? `/api/donaciones/${dEditing.id}` : '/api/donaciones';
       const method  = dEditing ? 'PUT' : 'POST';
       const res     = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const json    = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message ?? json?.error ?? 'Error');
+      const saved: Donation = json.data;
       toast.success(dEditing ? 'Donación actualizada' : 'Donación registrada');
       setDModal(false);
-      loadDonations();
+      // Actualización inmediata
+      if (dEditing) {
+        setDonations(prev => prev.map(d => d.id === dEditing.id ? { ...d, ...saved } : d));
+      } else {
+        setDonations(prev => [saved, ...prev]);
+      }
+      loadDonations(); // sync con servidor en background
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Error'); }
     finally { setDSaving(false); }
   }
@@ -167,10 +175,18 @@ export default function DonacionesPage() {
       const url    = doEditing ? `/api/donantes/${doEditing.id}` : '/api/donantes';
       const method = doEditing ? 'PUT' : 'POST';
       const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) });
-      if (!res.ok) throw new Error((await res.json()).error);
+      const json   = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message ?? json?.error ?? 'Error');
+      const saved: Donor = json.data;
       toast.success(doEditing ? 'Donante actualizado' : 'Donante creado');
       setDoModal(false);
-      loadDonors();
+      // Actualización inmediata sin esperar el fetch de recarga
+      if (doEditing) {
+        setDonors(prev => prev.map(d => d.id === doEditing.id ? { ...d, ...saved } : d));
+      } else {
+        setDonors(prev => [saved, ...prev]);
+      }
+      loadDonors(); // sync con servidor en background
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Error'); }
     finally { setDoSaving(false); }
   }
