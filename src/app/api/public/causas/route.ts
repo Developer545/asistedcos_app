@@ -18,6 +18,17 @@ export async function GET() {
       where: { publishOnWeb: true, active: true },
       orderBy: { webOrder: 'asc' },
     });
+
+    // Sum real donations per project
+    const donationSums = await prisma.donation.groupBy({
+      by: ['projectId'],
+      _sum: { amount: true },
+      where: { projectId: { in: projects.map(p => p.id) } },
+    });
+    const sumMap = Object.fromEntries(
+      donationSums.map(d => [d.projectId, Number(d._sum.amount ?? 0)])
+    );
+
     // Map to WebCause-compatible shape for ong-web compatibility
     const causes = projects.map(p => ({
       id:          p.id,
@@ -28,7 +39,7 @@ export async function GET() {
       ubicacion:   p.ubicacion,
       estado:      p.estado,
       meta:        p.meta,
-      recaudado:   p.recaudado,
+      recaudado:   sumMap[p.id] ?? Number(p.recaudado),
       active:      p.active,
       order:       p.webOrder,
       createdAt:   p.createdAt,

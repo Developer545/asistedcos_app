@@ -195,8 +195,8 @@ type GalleryItem = { id: string; title?: string; url: string; category?: string;
 type Cause = {
   id: string; name: string; description?: string; tag?: string;
   coverImage?: string; ubicacion?: string; estado: string;
-  meta: number; recaudado: number; active: boolean; webOrder: number;
-  publishOnWeb: boolean;
+  meta: number; recaudado: number; recaudadoReal: number;
+  active: boolean; webOrder: number; publishOnWeb: boolean;
 };
 type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
 type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
@@ -640,10 +640,18 @@ export default function GestionWebPage() {
     { title: 'Nombre', dataIndex: 'name', key: 'name', ellipsis: true },
     { title: 'Tag', dataIndex: 'tag', key: 'tag', render: v => v ? <Tag color="green">{v}</Tag> : '-', width: 110 },
     {
-      title: 'Progreso', key: 'pct', width: 160, render: (_, r) => {
-        const meta = Number(r.meta); const rec = Number(r.recaudado);
-        const pct = meta > 0 ? Math.round((rec / meta) * 100) : 0;
-        return <Progress percent={pct} size="small" strokeColor="#16a34a" />;
+      title: 'Progreso donaciones', key: 'pct', width: 190, render: (_, r) => {
+        const meta = Number(r.meta);
+        const rec  = Number(r.recaudadoReal ?? r.recaudado);
+        const pct  = meta > 0 ? Math.min(Math.round((rec / meta) * 100), 100) : 0;
+        return (
+          <div>
+            <Progress percent={pct} size="small" strokeColor="#16a34a" />
+            <span style={{ fontSize: 11, color: 'hsl(var(--text-muted))' }}>
+              ${rec.toLocaleString()} / ${meta.toLocaleString()}
+            </span>
+          </div>
+        );
       }
     },
     { title: 'Meta', dataIndex: 'meta', key: 'meta', render: v => `$${Number(v).toLocaleString()}`, width: 90 },

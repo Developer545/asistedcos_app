@@ -7,10 +7,26 @@ export async function GET(req: NextRequest) {
   try {
     await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
-    const [data, total] = await prisma.$transaction([
+    const [projects, total] = await prisma.$transaction([
       prisma.project.findMany({ skip, take: limit, orderBy: { webOrder: 'asc' } }),
       prisma.project.count(),
     ]);
+
+    // Sum real donations per project
+    const donationSums = await prisma.donation.groupBy({
+      by: ['projectId'],
+      _sum: { amount: true },
+      where: { projectId: { in: projects.map(p => p.id) } },
+    });
+    const sumMap = Object.fromEntries(
+      donationSums.map(d => [d.projectId, Number(d._sum.amount ?? 0)])
+    );
+
+    const data = projects.map(p => ({
+      ...p,
+      recaudadoReal: sumMap[p.id] ?? 0,
+    }));
+
     return paginate(data, total, page, limit);
   } catch (e) { return apiError(e); }
 }
