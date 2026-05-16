@@ -42,6 +42,8 @@ export async function GET() {
       recaudado:   sumMap[p.id] ?? Number(p.recaudado),
       active:      p.active,
       order:       p.webOrder,
+      startDate:   p.startDate,
+      endDate:     p.endDate,
       createdAt:   p.createdAt,
       updatedAt:   p.updatedAt,
     }));
