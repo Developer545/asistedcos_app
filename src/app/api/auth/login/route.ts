@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { signAccessToken, signRefreshToken, setAuthCookies } from '@/lib/auth';
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     ]);
 
     await setAuthCookies(accessToken, refreshToken);
-    return NextResponse.json(ok({ name: user.name, role: user.role }));
+    return ok({ name: user.name, role: user.role });
 
   } catch (err: unknown) {
     return apiError(err);

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { ok, apiError } from '@/lib/response';
@@ -14,7 +14,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       include: { donations: { orderBy: { date: 'desc' }, take: 10 } },
     });
     if (!donor) throw new NotFoundError('Donante');
-    return NextResponse.json(ok(donor));
+    return ok(donor);
   } catch (err) { return apiError(err); }
 }
 
@@ -32,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
               email: email || null, phone: phone || null,
               address: address || null, isCompany: !!isCompany, notes: notes || null },
     });
-    return NextResponse.json(ok(donor));
+    return ok(donor);
   } catch (err) { return apiError(err); }
 }
 
@@ -42,6 +42,6 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     if (!user) throw new UnauthorizedError();
     const { id } = await params;
     await prisma.donor.delete({ where: { id } });
-    return NextResponse.json(ok({ deleted: true }));
+    return ok({ deleted: true });
   } catch (err) { return apiError(err); }
 }
