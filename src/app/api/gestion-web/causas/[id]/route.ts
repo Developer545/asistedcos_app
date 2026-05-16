@@ -22,17 +22,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const project = await prisma.project.update({
       where: { id },
       data: {
-        name:        name?.trim(),
-        description: description || null,
-        tag:         tag || null,
-        coverImage:  coverImage || null,
-        ubicacion:   ubicacion || null,
-        estado:      estado ?? 'Activo',
-        meta:        meta ?? 0,
-        recaudado:   recaudado ?? 0,
-        active:      active,
-        webOrder:    webOrder ?? 0,
-        publishOnWeb: publishOnWeb,
+        name:        name         !== undefined ? name.trim()           : undefined,
+        description: description  !== undefined ? (description || null) : undefined,
+        tag:         tag          !== undefined ? (tag || null)         : undefined,
+        coverImage:  coverImage   !== undefined ? (coverImage || null)  : undefined,
+        ubicacion:   ubicacion    !== undefined ? (ubicacion || null)   : undefined,
+        estado:      estado       !== undefined ? estado                : undefined,
+        meta:        meta         !== undefined ? meta                  : undefined,
+        recaudado:   recaudado    !== undefined ? recaudado             : undefined,
+        active:      active       !== undefined ? active                : undefined,
+        webOrder:    webOrder     !== undefined ? webOrder              : undefined,
+        publishOnWeb: publishOnWeb !== undefined ? publishOnWeb         : undefined,
       },
     });
     return ok(project);
