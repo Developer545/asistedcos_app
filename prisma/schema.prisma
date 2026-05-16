@@ -164,6 +164,14 @@ model Project {
   budget      Decimal  @default(0) @db.Decimal(12, 2)
   active      Boolean  @default(true)
   coverImage  String?  // Cloudinary URL
+  // Web publication fields
+  publishOnWeb Boolean  @default(false)
+  tag          String?
+  ubicacion    String?
+  estado       String   @default("Activo")
+  meta         Decimal  @default(0) @db.Decimal(12, 2)
+  recaudado    Decimal  @default(0) @db.Decimal(12, 2)
+  webOrder     Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -731,23 +739,6 @@ model WebGallery {
   @@map("web_gallery")
 }
 
-model WebCause {
-  id          String   @id @default(cuid())
-  titulo      String
-  descripcion String?
-  tag         String?  // e.g. "Manglar", "Reforestación", "Agua"
-  coverImage  String?  // Cloudinary URL
-  ubicacion   String?  // e.g. "Playa San Diego, La Libertad"
-  estado      String   @default("Activo") // "Activo" | "Completado" | "Continuo"
-  meta        Decimal  @default(0) @db.Decimal(12, 2)
-  recaudado   Decimal  @default(0) @db.Decimal(12, 2)
-  active      Boolean  @default(true)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@map("web_causes")
-}
 
 model WebFaq {
   id        String   @id @default(cuid())

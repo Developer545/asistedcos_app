@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
     const body = await req.json();
-    const { name, description, startDate, endDate, budget } = body;
+    const { name, description, startDate, endDate, budget, publishOnWeb, tag, ubicacion, estado, meta, recaudado, webOrder } = body;
     if (!name?.trim()) throw new ValidationError('El nombre del proyecto es requerido');
     const project = await prisma.project.create({
       data: {
@@ -39,6 +39,13 @@ export async function POST(req: NextRequest) {
         startDate: startDate ? new Date(startDate) : null,
         endDate:   endDate   ? new Date(endDate)   : null,
         budget:    budget ? parseFloat(budget) : 0,
+        publishOnWeb: publishOnWeb ?? false,
+        tag:      tag      || null,
+        ubicacion: ubicacion || null,
+        estado:   estado   ?? 'Activo',
+        meta:     meta     ? parseFloat(meta) : 0,
+        recaudado: recaudado ? parseFloat(recaudado) : 0,
+        webOrder: webOrder ?? 0,
       },
     });
     return created(project);

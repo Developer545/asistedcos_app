@@ -7,9 +7,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   try {
     await getCurrentUser();
     const { id } = await params;
-    const cause = await prisma.webCause.findUnique({ where: { id } });
-    if (!cause) return apiError('No encontrado', 404);
-    return ok(cause);
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) return apiError('No encontrado', 404);
+    return ok(project);
   } catch (e) { return apiError(e); }
 }
 
@@ -18,12 +18,24 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await getCurrentUser();
     const { id } = await params;
     const body = await req.json();
-    const { titulo, descripcion, tag, coverImage, ubicacion, estado, meta, recaudado, active, order } = body;
-    const cause = await prisma.webCause.update({
+    const { name, description, tag, coverImage, ubicacion, estado, meta, recaudado, active, webOrder, publishOnWeb } = body;
+    const project = await prisma.project.update({
       where: { id },
-      data: { titulo, descripcion, tag, coverImage, ubicacion, estado: estado ?? 'Activo', meta: meta ?? 0, recaudado: recaudado ?? 0, active, order },
+      data: {
+        name:        name?.trim(),
+        description: description || null,
+        tag:         tag || null,
+        coverImage:  coverImage || null,
+        ubicacion:   ubicacion || null,
+        estado:      estado ?? 'Activo',
+        meta:        meta ?? 0,
+        recaudado:   recaudado ?? 0,
+        active:      active,
+        webOrder:    webOrder ?? 0,
+        publishOnWeb: publishOnWeb,
+      },
     });
-    return ok(cause);
+    return ok(project);
   } catch (e) { return apiError(e); }
 }
 
@@ -31,7 +43,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   try {
     await getCurrentUser();
     const { id } = await params;
-    await prisma.webCause.delete({ where: { id } });
+    await prisma.project.delete({ where: { id } });
     return noContent();
   } catch (e) { return apiError(e); }
 }

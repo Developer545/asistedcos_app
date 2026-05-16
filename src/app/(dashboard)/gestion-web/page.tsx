@@ -193,9 +193,10 @@ type News = {
 type WebContent = { id: string; section: string; key: string; value: string; type: string };
 type GalleryItem = { id: string; title?: string; url: string; category?: string; order: number; createdAt: string };
 type Cause = {
-  id: string; titulo: string; descripcion?: string; tag?: string;
+  id: string; name: string; description?: string; tag?: string;
   coverImage?: string; ubicacion?: string; estado: string;
-  meta: number; recaudado: number; active: boolean; order: number;
+  meta: number; recaudado: number; active: boolean; webOrder: number;
+  publishOnWeb: boolean;
 };
 type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
 type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
@@ -241,6 +242,7 @@ export default function GestionWebPage() {
   const [causesModal, setCausesModal] = useState(false);
   const [causeEditing, setCauseEditing] = useState<Cause | null>(null);
   const [causesSaving, setCausesSaving] = useState(false);
+  const [causesToggling, setCausesToggling] = useState<string | null>(null);
   const [causesForm] = Form.useForm();
 
   /* ── FAQ ─────────────────────────────────── */
@@ -468,6 +470,7 @@ export default function GestionWebPage() {
     setCauseEditing(item ?? null);
     causesForm.resetFields();
     if (item) causesForm.setFieldsValue({ ...item, meta: Number(item.meta), recaudado: Number(item.recaudado) });
+    else causesForm.setFieldsValue({ active: true, publishOnWeb: false, estado: 'Activo', meta: 0, recaudado: 0, webOrder: 0 });
     setCausesModal(true);
   }
 
@@ -478,7 +481,7 @@ export default function GestionWebPage() {
       const method = causeEditing ? 'PUT' : 'POST';
       const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
       if (!r.ok) throw new Error((await r.json()).error ?? 'Error');
-      toast.success(causeEditing ? 'Causa actualizada' : 'Causa creada');
+      toast.success(causeEditing ? 'Proyecto actualizado' : 'Proyecto creado');
       setCausesModal(false);
       loadCauses();
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
@@ -488,9 +491,24 @@ export default function GestionWebPage() {
   async function deleteCause(id: string) {
     try {
       await fetch(`/api/gestion-web/causas/${id}`, { method: 'DELETE' });
-      toast.success('Causa eliminada');
+      toast.success('Proyecto eliminado');
       loadCauses();
     } catch { toast.error('Error eliminando'); }
+  }
+
+  async function toggleCausePublishOnWeb(cause: Cause) {
+    setCausesToggling(cause.id);
+    try {
+      const r = await fetch(`/api/gestion-web/causas/${cause.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publishOnWeb: !cause.publishOnWeb }),
+      });
+      if (!r.ok) throw new Error();
+      toast.success(!cause.publishOnWeb ? 'Publicado en la web' : 'Quitado de la web');
+      loadCauses();
+    } catch { toast.error('Error actualizando'); }
+    finally { setCausesToggling(null); }
   }
 
   /* ── FAQ CRUD ─────────────────────────────────── */
@@ -619,7 +637,7 @@ export default function GestionWebPage() {
   ];
 
   const causesCols: ColumnsType<Cause> = [
-    { title: 'Título', dataIndex: 'titulo', key: 'titulo', ellipsis: true },
+    { title: 'Nombre', dataIndex: 'name', key: 'name', ellipsis: true },
     { title: 'Tag', dataIndex: 'tag', key: 'tag', render: v => v ? <Tag color="green">{v}</Tag> : '-', width: 110 },
     {
       title: 'Progreso', key: 'pct', width: 160, render: (_, r) => {
@@ -631,10 +649,24 @@ export default function GestionWebPage() {
     { title: 'Meta', dataIndex: 'meta', key: 'meta', render: v => `$${Number(v).toLocaleString()}`, width: 90 },
     { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
     {
+      title: <Tooltip title="Visible en el sitio web público"><Globe size={14} /></Tooltip>,
+      dataIndex: 'publishOnWeb', key: 'publishOnWeb', width: 90, align: 'center' as const,
+      render: (_: unknown, r: Cause) => (
+        <Switch
+          size="small"
+          checked={r.publishOnWeb}
+          loading={causesToggling === r.id}
+          onChange={() => toggleCausePublishOnWeb(r)}
+          checkedChildren="Web"
+          unCheckedChildren="No"
+        />
+      ),
+    },
+    {
       title: '', key: 'actions', width: 90, render: (_, r) => (
         <Space>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openCausesModal(r)} />
-          <Popconfirm title="¿Eliminar causa?" onConfirm={() => deleteCause(r.id)} okText="Sí" cancelText="No">
+          <Popconfirm title="¿Eliminar proyecto?" onConfirm={() => deleteCause(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
           </Popconfirm>
         </Space>
@@ -743,9 +775,9 @@ export default function GestionWebPage() {
       children: (
         <div>
           <Alert type="info" showIcon style={{ marginBottom: 16 }}
-            message="Las causas aparecen en la página principal del sitio web como tarjetas con barras de progreso de recaudación." />
+            message='Los proyectos son compartidos con el módulo "Proyectos". Activa "Publicar en web" para que aparezcan en el sitio público con barra de progreso.' />
           <div style={{ marginBottom: 16, textAlign: 'right' }}>
-            <Button type="primary" icon={<Plus size={14} />} onClick={() => openCausesModal()}>Nueva causa</Button>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openCausesModal()}>Nuevo proyecto</Button>
           </div>
           <Table dataSource={causes} columns={causesCols} rowKey="id" loading={causesLoading} size="small" pagination={false} />
         </div>
@@ -1105,7 +1137,7 @@ export default function GestionWebPage() {
 
       {/* Causes Modal */}
       <Modal
-        title={causeEditing ? 'Editar causa' : 'Nueva causa'}
+        title={causeEditing ? 'Editar proyecto' : 'Nuevo proyecto'}
         open={causesModal}
         onCancel={() => setCausesModal(false)}
         onOk={() => causesForm.submit()}
@@ -1116,7 +1148,7 @@ export default function GestionWebPage() {
         <Form form={causesForm} layout="vertical" onFinish={saveCause}>
           <Row gutter={12}>
             <Col span={16}>
-              <Form.Item name="titulo" label="Título" rules={[{ required: true }]}>
+              <Form.Item name="name" label="Nombre del proyecto" rules={[{ required: true, message: 'El nombre es requerido' }]}>
                 <Input />
               </Form.Item>
             </Col>
@@ -1126,23 +1158,23 @@ export default function GestionWebPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="descripcion" label="Descripción">
+          <Form.Item name="description" label="Descripción">
             <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item name="ubicacion" label="Ubicación (ej: Playa San Diego, La Libertad)">
             <Input />
           </Form.Item>
           <Form.Item name="coverImage" label="Imagen">
-            <CloudinaryUpload folder="asistedcos/causas" aspectHint="4:3 recomendado" />
+            <CloudinaryUpload folder="asistedcos/proyectos" aspectHint="4:3 recomendado" />
           </Form.Item>
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="meta" label="Meta (USD)" rules={[{ required: true }]}>
+              <Form.Item name="meta" label="Meta (USD)">
                 <InputNumber min={0} step={1000} prefix="$" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="recaudado" label="Recaudado (USD)" rules={[{ required: true }]}>
+              <Form.Item name="recaudado" label="Recaudado (USD)">
                 <InputNumber min={0} step={100} prefix="$" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
@@ -1158,13 +1190,18 @@ export default function GestionWebPage() {
           </Row>
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="order" label="Orden">
+              <Form.Item name="webOrder" label="Orden en web">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="active" label="Publicado" valuePropName="checked" initialValue={true}>
-                <Switch />
+              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="publishOnWeb" label="Publicar en web" valuePropName="checked" initialValue={false}>
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
               </Form.Item>
             </Col>
           </Row>

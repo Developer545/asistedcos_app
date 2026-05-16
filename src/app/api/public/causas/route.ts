@@ -14,10 +14,26 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const causes = await prisma.webCause.findMany({
-      where: { active: true },
-      orderBy: { order: 'asc' },
+    const projects = await prisma.project.findMany({
+      where: { publishOnWeb: true, active: true },
+      orderBy: { webOrder: 'asc' },
     });
+    // Map to WebCause-compatible shape for ong-web compatibility
+    const causes = projects.map(p => ({
+      id:          p.id,
+      titulo:      p.name,
+      descripcion: p.description,
+      tag:         p.tag,
+      coverImage:  p.coverImage,
+      ubicacion:   p.ubicacion,
+      estado:      p.estado,
+      meta:        p.meta,
+      recaudado:   p.recaudado,
+      active:      p.active,
+      order:       p.webOrder,
+      createdAt:   p.createdAt,
+      updatedAt:   p.updatedAt,
+    }));
     return NextResponse.json({ success: true, data: causes });
   } catch { return NextResponse.json({ success: true, data: [] }); }
 }

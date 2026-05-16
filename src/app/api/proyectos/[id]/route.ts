@@ -24,16 +24,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!user) throw new UnauthorizedError();
     const { id } = await params;
     const body = await req.json();
-    const { name, description, startDate, endDate, budget, active } = body;
+    const { name, description, startDate, endDate, budget, active, publishOnWeb, tag, ubicacion, estado, meta, recaudado, webOrder } = body;
     const project = await prisma.project.update({
       where: { id },
       data: {
-        name: name?.trim(),
+        name:        name?.trim(),
         description: description || null,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate:   endDate   ? new Date(endDate)   : null,
-        budget:    budget !== undefined ? parseFloat(budget) : undefined,
-        active:    active !== undefined ? active : undefined,
+        startDate:   startDate ? new Date(startDate) : null,
+        endDate:     endDate   ? new Date(endDate)   : null,
+        budget:      budget      !== undefined ? parseFloat(budget)      : undefined,
+        active:      active      !== undefined ? active                  : undefined,
+        publishOnWeb: publishOnWeb !== undefined ? publishOnWeb          : undefined,
+        tag:         tag         !== undefined ? (tag || null)           : undefined,
+        ubicacion:   ubicacion   !== undefined ? (ubicacion || null)     : undefined,
+        estado:      estado      !== undefined ? estado                  : undefined,
+        meta:        meta        !== undefined ? parseFloat(meta)        : undefined,
+        recaudado:   recaudado   !== undefined ? parseFloat(recaudado)   : undefined,
+        webOrder:    webOrder    !== undefined ? webOrder                : undefined,
       },
     });
     return NextResponse.json(ok(project));

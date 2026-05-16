@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber,
-  DatePicker, Space, Tag, Popconfirm, Switch, Row, Col,
+  DatePicker, Space, Tag, Popconfirm, Switch, Row, Col, Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { FolderOpen, PencilSimple, Trash } from '@phosphor-icons/react';
+import { FolderOpen, PencilSimple, Trash, Globe } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import PageHeader from '@/components/shared/PageHeader';
@@ -15,7 +15,7 @@ import CloudinaryUpload from '@/components/shared/CloudinaryUpload';
 type Project = {
   id: string; name: string; description?: string;
   startDate?: string; endDate?: string; budget: number;
-  active: boolean; createdAt: string;
+  active: boolean; publishOnWeb: boolean; createdAt: string;
   _count?: { donations: number; participations: number };
 };
 
@@ -29,6 +29,7 @@ export default function ProyectosPage() {
   const [modal, setModal]       = useState(false);
   const [editing, setEditing]   = useState<Project | null>(null);
   const [saving, setSaving]     = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
   const [form]                  = Form.useForm();
 
   const load = useCallback(async () => {
@@ -54,7 +55,7 @@ export default function ProyectosPage() {
         budget:    Number(record.budget),
       });
     } else {
-      form.setFieldsValue({ active: true, budget: 0 });
+      form.setFieldsValue({ active: true, publishOnWeb: false, budget: 0 });
     }
     setModal(true);
   }
@@ -86,6 +87,21 @@ export default function ProyectosPage() {
     } catch { toast.error('Error al eliminar'); }
   }
 
+  async function togglePublishOnWeb(record: Project) {
+    setToggling(record.id);
+    try {
+      const res = await fetch(`/api/proyectos/${record.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publishOnWeb: !record.publishOnWeb }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(!record.publishOnWeb ? 'Publicado en la web' : 'Quitado de la web');
+      load();
+    } catch { toast.error('Error actualizando'); }
+    finally { setToggling(null); }
+  }
+
   const columns: ColumnsType<Project> = [
     { title: 'Nombre', dataIndex: 'name', ellipsis: true, sorter: (a, b) => a.name.localeCompare(b.name) },
     { title: 'Descripción', dataIndex: 'description', ellipsis: true,
@@ -100,6 +116,20 @@ export default function ProyectosPage() {
       render: (_: unknown, r: Project) => <Tag color="green">{r._count?.donations ?? 0}</Tag> },
     { title: 'Estado', dataIndex: 'active', width: 90,
       render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? 'Activo' : 'Inactivo'}</Tag> },
+    {
+      title: <Tooltip title="Visible en el sitio web público"><Globe size={14} /></Tooltip>,
+      dataIndex: 'publishOnWeb', width: 80, align: 'center',
+      render: (_: unknown, r: Project) => (
+        <Switch
+          size="small"
+          checked={r.publishOnWeb}
+          loading={toggling === r.id}
+          onChange={() => togglePublishOnWeb(r)}
+          checkedChildren="Web"
+          unCheckedChildren="No"
+        />
+      ),
+    },
     {
       title: '', width: 80, align: 'center',
       render: (_: unknown, r: Project) => (
@@ -159,13 +189,18 @@ export default function ProyectosPage() {
                 <InputNumber min={0} precision={2} prefix="$" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="active" label="Estado" valuePropName="checked">
-                <Switch checkedChildren="Activo" unCheckedChildren="Inactivo" />
+            <Col span={6}>
+              <Form.Item name="active" label="Activo" valuePropName="checked">
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="publishOnWeb" label="En sitio web" valuePropName="checked">
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="coverImage" label="Imagen de portada (aparece en el sitio web)">
+          <Form.Item name="coverImage" label="Imagen de portada">
             <CloudinaryUpload
               folder="asistedcos/proyectos"
               label="Subir foto del proyecto"

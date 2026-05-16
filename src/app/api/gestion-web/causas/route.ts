@@ -8,8 +8,8 @@ export async function GET(req: NextRequest) {
     await getCurrentUser();
     const { page, limit, skip } = parsePagination(req);
     const [data, total] = await prisma.$transaction([
-      prisma.webCause.findMany({ skip, take: limit, orderBy: { order: 'asc' } }),
-      prisma.webCause.count(),
+      prisma.project.findMany({ skip, take: limit, orderBy: { webOrder: 'asc' } }),
+      prisma.project.count(),
     ]);
     return paginate(data, total, page, limit);
   } catch (e) { return apiError(e); }
@@ -19,11 +19,23 @@ export async function POST(req: NextRequest) {
   try {
     await getCurrentUser();
     const body = await req.json();
-    const { titulo, descripcion, tag, coverImage, ubicacion, estado, meta, recaudado, active, order } = body;
-    if (!titulo?.trim()) return apiError('El título es requerido', 400);
-    const cause = await prisma.webCause.create({
-      data: { titulo, descripcion, tag, coverImage, ubicacion, estado: estado ?? 'Activo', meta: meta ?? 0, recaudado: recaudado ?? 0, active: active ?? true, order: order ?? 0 },
+    const { name, description, tag, coverImage, ubicacion, estado, meta, recaudado, active, webOrder, publishOnWeb } = body;
+    if (!name?.trim()) return apiError('El nombre es requerido', 400);
+    const project = await prisma.project.create({
+      data: {
+        name: name.trim(),
+        description: description || null,
+        tag: tag || null,
+        coverImage: coverImage || null,
+        ubicacion: ubicacion || null,
+        estado: estado ?? 'Activo',
+        meta: meta ?? 0,
+        recaudado: recaudado ?? 0,
+        active: active ?? true,
+        webOrder: webOrder ?? 0,
+        publishOnWeb: publishOnWeb ?? false,
+      },
     });
-    return created(cause);
+    return created(project);
   } catch (e) { return apiError(e); }
 }
