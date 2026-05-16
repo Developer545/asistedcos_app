@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, InputNumber,
-  DatePicker, Space, Tag, Popconfirm, Switch, Row, Col, Tooltip,
+  DatePicker, Space, Tag, Popconfirm, Switch, Row, Col, Tooltip, Progress,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FolderOpen, PencilSimple, Trash, Globe } from '@phosphor-icons/react';
@@ -16,6 +16,7 @@ type Project = {
   id: string; name: string; description?: string;
   startDate?: string; endDate?: string; budget: number;
   active: boolean; publishOnWeb: boolean; createdAt: string;
+  meta: number; recaudadoReal: number;
   _count?: { donations: number; participations: number };
 };
 
@@ -114,6 +115,23 @@ export default function ProyectosPage() {
       render: (v: number) => fmtUSD(Number(v)) },
     { title: 'Donaciones', width: 95, align: 'center',
       render: (_: unknown, r: Project) => <Tag color="green">{r._count?.donations ?? 0}</Tag> },
+    {
+      title: 'Recaudado', key: 'recaudado', width: 180,
+      render: (_: unknown, r: Project) => {
+        const meta = Number(r.meta);
+        const rec  = Number(r.recaudadoReal ?? 0);
+        if (meta === 0) return <span style={{ color: 'hsl(var(--text-muted))', fontSize: 12 }}>Sin meta</span>;
+        const pct = Math.min(Math.round((rec / meta) * 100), 100);
+        return (
+          <div>
+            <Progress percent={pct} size="small" strokeColor="#2d6b1a" style={{ marginBottom: 2 }} />
+            <span style={{ fontSize: 11, color: 'hsl(var(--text-muted))' }}>
+              {fmtUSD(rec)} / {fmtUSD(meta)}
+            </span>
+          </div>
+        );
+      },
+    },
     { title: 'Estado', dataIndex: 'active', width: 90,
       render: (v: boolean) => <Tag color={v ? 'success' : 'default'}>{v ? 'Activo' : 'Inactivo'}</Tag> },
     {
