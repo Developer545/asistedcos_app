@@ -24,23 +24,24 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!user) throw new UnauthorizedError();
     const { id } = await params;
     const body = await req.json();
-    const { name, description, startDate, endDate, budget, active, publishOnWeb, tag, ubicacion, estado, meta, recaudado, webOrder } = body;
+    const { name, description, startDate, endDate, budget, active, coverImage, publishOnWeb, tag, ubicacion, estado, meta, recaudado, webOrder } = body;
     const project = await prisma.project.update({
       where: { id },
       data: {
-        name:        name         !== undefined ? name.trim()                        : undefined,
-        description: description  !== undefined ? (description || null)              : undefined,
+        name:        name         !== undefined ? name.trim()                              : undefined,
+        description: description  !== undefined ? (description || null)                    : undefined,
         startDate:   startDate    !== undefined ? (startDate ? new Date(startDate) : null) : undefined,
         endDate:     endDate      !== undefined ? (endDate   ? new Date(endDate)   : null) : undefined,
-        budget:      budget       !== undefined ? parseFloat(budget)                : undefined,
-        active:      active       !== undefined ? active                            : undefined,
-        publishOnWeb: publishOnWeb !== undefined ? publishOnWeb                     : undefined,
-        tag:         tag          !== undefined ? (tag || null)                     : undefined,
-        ubicacion:   ubicacion    !== undefined ? (ubicacion || null)               : undefined,
-        estado:      estado       !== undefined ? estado                            : undefined,
-        meta:        meta         !== undefined ? parseFloat(meta)                  : undefined,
-        recaudado:   recaudado    !== undefined ? parseFloat(recaudado)             : undefined,
-        webOrder:    webOrder     !== undefined ? webOrder                          : undefined,
+        budget:      budget       !== undefined ? parseFloat(budget)                       : undefined,
+        active:      active       !== undefined ? active                                   : undefined,
+        coverImage:  coverImage   !== undefined ? (coverImage || null)                     : undefined,
+        publishOnWeb: publishOnWeb !== undefined ? publishOnWeb                            : undefined,
+        tag:         tag          !== undefined ? (tag || null)                            : undefined,
+        ubicacion:   ubicacion    !== undefined ? (ubicacion || null)                      : undefined,
+        estado:      estado       !== undefined ? estado                                   : undefined,
+        meta:        meta         !== undefined ? parseFloat(meta)                         : undefined,
+        recaudado:   recaudado    !== undefined ? parseFloat(recaudado)                    : undefined,
+        webOrder:    webOrder     !== undefined ? webOrder                                 : undefined,
       },
     });
     return NextResponse.json(ok(project));
