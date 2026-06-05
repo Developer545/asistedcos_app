@@ -200,16 +200,13 @@ type Cause = {
 };
 type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
 type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
-<<<<<<< HEAD
 type Campaign = {
   id: string; titulo: string; descripcion?: string;
   fechaEvento?: string; fechaFin?: string;
   metaUnidades: number; recaudadoUnidades: number; unidadLabel: string;
   aporteSugerido: number; coverImage?: string; activo: boolean;
 };
-=======
 type Testimonial = { id: string; quote: string; name: string; role: string; initials: string; photo?: string; active: boolean; order: number };
->>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
 
 function slugify(text: string) {
   return text.toLowerCase()
@@ -364,7 +361,6 @@ export default function GestionWebPage() {
     finally { setPartnersLoading(false); }
   }, []);
 
-<<<<<<< HEAD
   const loadCampaigns = useCallback(async () => {
     setCampaignLoading(true);
     try {
@@ -373,7 +369,8 @@ export default function GestionWebPage() {
       setCampaigns(d.data ?? []);
     } catch { toast.error('Error cargando campañas'); }
     finally { setCampaignLoading(false); }
-=======
+  }, []);
+
   const loadTestimonials = useCallback(async () => {
     setTestimonialsLoading(true);
     try {
@@ -382,7 +379,6 @@ export default function GestionWebPage() {
       setTestimonials(d.data ?? []);
     } catch { toast.error('Error cargando testimonios'); }
     finally { setTestimonialsLoading(false); }
->>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
   }, []);
 
   const loadBiblioteca = useCallback(async () => {
@@ -401,11 +397,8 @@ export default function GestionWebPage() {
   useEffect(() => { if (tab === 'causas') loadCauses(); }, [tab, loadCauses]);
   useEffect(() => { if (tab === 'faq') loadFaq(); }, [tab, loadFaq]);
   useEffect(() => { if (tab === 'aliados') loadPartners(); }, [tab, loadPartners]);
-<<<<<<< HEAD
   useEffect(() => { if (tab === 'campana') loadCampaigns(); }, [tab, loadCampaigns]);
-=======
   useEffect(() => { if (tab === 'testimonios') loadTestimonials(); }, [tab, loadTestimonials]);
->>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
   useEffect(() => { if (tab === 'biblioteca') loadBiblioteca(); }, [tab, bibFolder, loadBiblioteca]);
 
   /* ── News CRUD ─────────────────────────────────── */
@@ -603,7 +596,6 @@ export default function GestionWebPage() {
     } catch { toast.error('Error eliminando'); }
   }
 
-<<<<<<< HEAD
   /* ── Campaña CRUD ─────────────────────────────────── */
   function openCampaignModal(item?: Campaign) {
     setCampaignEditing(item ?? null);
@@ -643,7 +635,8 @@ export default function GestionWebPage() {
       toast.success('Campaña eliminada');
       loadCampaigns();
     } catch { toast.error('Error eliminando campaña'); }
-=======
+  }
+
   /* ── Testimonials CRUD ─────────────────────────────────── */
   function openTestimonialsModal(item?: Testimonial) {
     setTestimonialEditing(item ?? null);
@@ -672,7 +665,6 @@ export default function GestionWebPage() {
       toast.success('Testimonio eliminado');
       loadTestimonials();
     } catch { toast.error('Error eliminando'); }
->>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
   }
 
   /* ── Deploy ─────────────────────────────────── */
