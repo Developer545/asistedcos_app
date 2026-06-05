@@ -144,6 +144,9 @@ model Donor {
   updatedAt   DateTime @updatedAt
 
   donations   Donation[]
+  diligencia  DonorDiligencia?
+  alertas     AmlAlerta[]
+  ros         ROS[]
 
   @@map("donors")
 }
@@ -221,6 +224,7 @@ model Donation {
   donor         Donor         @relation(fields: [donorId], references: [id])
   project       Project?      @relation(fields: [projectId], references: [id])
   certificate   DonationCert?
+  alertas       AmlAlerta[]
 
   @@map("donations")
 }
@@ -769,6 +773,23 @@ model WebPartner {
   @@map("web_partners")
 }
 
+model WebCampaign {
+  id             String    @id @default(cuid())
+  titulo         String
+  descripcion    String?
+  fechaEvento    DateTime?
+  fechaFin       DateTime?
+  metaUnidades   Int       @default(0)
+  unidadLabel    String    @default("Unidades")
+  aporteSugerido Decimal   @default(25) @db.Decimal(10, 2)
+  coverImage     String?
+  activo         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("web_campaigns")
+}
+
 // ═══════════════════════════════════════════════
 // CONTABILIDAD ONG
 // ═══════════════════════════════════════════════
@@ -807,6 +828,41 @@ enum OrigenAsiento {
 enum EstadoPeriodo {
   ABIERTO
   CERRADO
+}
+
+// ─── AML / Cumplimiento ───────────────────────────────────
+enum NivelRiesgoAml {
+  BAJO
+  MEDIO
+  ALTO
+  MUY_ALTO
+}
+
+enum EstadoDiligencia {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  REQUIERE_INFO
+}
+
+enum TipoAlertaAml {
+  EFECTIVO_ALTO      // Donación en efectivo >= $10,000
+  FRACCIONAMIENTO    // Múltiples operaciones fraccionadas
+  DONANTE_SIN_DD     // Donante activo sin debida diligencia
+  DONANTE_EXTRANJERO // Donación extranjera sin documentar
+  PATRON_INUSUAL     // Detectado manualmente
+}
+
+enum EstadoAlertaAml {
+  PENDIENTE
+  REVISADA
+  DESCARTADA
+  ESCALADA
+}
+
+enum EstadoRos {
+  BORRADOR
+  ENVIADO
 }
 
 // Catálogo de cuentas contables (Plan de Cuentas ONG)
@@ -968,4 +1024,95 @@ model BudgetLine {
   budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 
   @@map("budget_lines")
+}
+
+// ═══════════════════════════════════════════════
+// CUMPLIMIENTO AML — Decreto 426 (oct 2025)
+// ═══════════════════════════════════════════════
+
+// Debida Diligencia de Donantes (KYD — Know Your Donor)
+model DonorDiligencia {
+  id                   String           @id @default(cuid())
+  donorId              String           @unique
+  donor                Donor            @relation(fields: [donorId], references: [id])
+
+  nivelRiesgo          NivelRiesgoAml   @default(BAJO)
+  tipoFuente           String           @default("NACIONAL") // NACIONAL | EXTRANJERO | INTERNACIONAL_ONG
+  fuenteFondos         String?          // Descripción de la fuente de fondos
+  propositoFondos      String?          // Propósito declarado de los fondos
+  montoAnualEstimado   Decimal?         @db.Decimal(12, 2)
+
+  // Verificación listas internacionales
+  verificadoOFAC       Boolean          @default(false)
+  verificadoONU        Boolean          @default(false)
+  verificadoINTERPOL   Boolean          @default(false)
+  fechaVerificacion    DateTime?
+
+  estado               EstadoDiligencia @default(PENDIENTE)
+  observaciones        String?
+  documentos           Json?            // Array de {nombre, url, fecha}
+
+  revisadoPor          String?          // userId del revisor
+  fechaRevision        DateTime?
+  proximaRevision      DateTime?        // Recordatorio de revisión periódica
+
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@map("donor_diligencias")
+}
+
+// Alertas automáticas y manuales de operaciones sospechosas
+model AmlAlerta {
+  id               String          @id @default(cuid())
+  tipo             TipoAlertaAml
+  estado           EstadoAlertaAml @default(PENDIENTE)
+
+  donorId          String?
+  donor            Donor?          @relation(fields: [donorId], references: [id])
+  donationId       String?
+  donation         Donation?       @relation(fields: [donationId], references: [id])
+
+  descripcion      String
+  montoInvolucrado Decimal?        @db.Decimal(12, 2)
+
+  revisadoPor      String?         // userId
+  fechaRevision    DateTime?
+  notasRevision    String?
+
+  rosId            String?
+  ros              ROS?            @relation(fields: [rosId], references: [id])
+
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([estado])
+  @@index([donorId])
+  @@map("aml_alertas")
+}
+
+// Reporte de Operación Sospechosa (ROS) — enviado a UAF/FGR
+model ROS {
+  id               String    @id @default(cuid())
+  numero           String    @unique  // ROS-2026-001
+  estado           EstadoRos @default(BORRADOR)
+
+  donorId          String?
+  donor            Donor?    @relation(fields: [donorId], references: [id])
+
+  descripcion      String    // Descripción detallada de la operación
+  montoEstimado    Decimal?  @db.Decimal(12, 2)
+  fechaOperacion   DateTime
+  tipoActividad    String    // Tipo de actividad sospechosa
+  mediosUtilizados String?   // Efectivo, transferencia, criptomonedas, etc.
+
+  fechaEnvio       DateTime? // Fecha de envío a la UAF/FGR
+  referencia       String?   // Número asignado por la autoridad competente
+
+  alertas          AmlAlerta[]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("ros_reportes")
 }

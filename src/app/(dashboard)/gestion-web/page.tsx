@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
   Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
-  InputNumber, Spin, Progress, Select, Image, Tooltip, Empty,
+  InputNumber, Spin, Progress, Select, Image, Tooltip, Empty, DatePicker,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -198,6 +198,12 @@ type Cause = {
 };
 type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
 type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
+type Campaign = {
+  id: string; titulo: string; descripcion?: string;
+  fechaEvento?: string; fechaFin?: string;
+  metaUnidades: number; unidadLabel: string;
+  aporteSugerido: number; coverImage?: string; activo: boolean;
+};
 
 function slugify(text: string) {
   return text.toLowerCase()
@@ -256,6 +262,14 @@ export default function GestionWebPage() {
   const [partnerEditing, setPartnerEditing] = useState<Partner | null>(null);
   const [partnersSaving, setPartnersSaving] = useState(false);
   const [partnersForm] = Form.useForm();
+
+  /* ── Campaña ─────────────────────────────────── */
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campaignLoading, setCampaignLoading] = useState(false);
+  const [campaignModal, setCampaignModal] = useState(false);
+  const [campaignEditing, setCampaignEditing] = useState<Campaign | null>(null);
+  const [campaignSaving, setCampaignSaving] = useState(false);
+  const [campaignForm] = Form.useForm();
 
   /* ── Deploy ─────────────────────────────────── */
   const [deploying, setDeploying] = useState(false);
@@ -330,6 +344,16 @@ export default function GestionWebPage() {
     finally { setPartnersLoading(false); }
   }, []);
 
+  const loadCampaigns = useCallback(async () => {
+    setCampaignLoading(true);
+    try {
+      const r = await fetch('/api/gestion-web/campana');
+      const d = await r.json();
+      setCampaigns(d.data ?? []);
+    } catch { toast.error('Error cargando campañas'); }
+    finally { setCampaignLoading(false); }
+  }, []);
+
   const loadBiblioteca = useCallback(async () => {
     setBibLoading(true);
     try {
@@ -346,6 +370,7 @@ export default function GestionWebPage() {
   useEffect(() => { if (tab === 'causas') loadCauses(); }, [tab, loadCauses]);
   useEffect(() => { if (tab === 'faq') loadFaq(); }, [tab, loadFaq]);
   useEffect(() => { if (tab === 'aliados') loadPartners(); }, [tab, loadPartners]);
+  useEffect(() => { if (tab === 'campana') loadCampaigns(); }, [tab, loadCampaigns]);
   useEffect(() => { if (tab === 'biblioteca') loadBiblioteca(); }, [tab, bibFolder, loadBiblioteca]);
 
   /* ── News CRUD ─────────────────────────────────── */
@@ -521,6 +546,47 @@ export default function GestionWebPage() {
     } catch { toast.error('Error eliminando'); }
   }
 
+  /* ── Campaña CRUD ─────────────────────────────────── */
+  function openCampaignModal(item?: Campaign) {
+    setCampaignEditing(item ?? null);
+    campaignForm.resetFields();
+    if (item) {
+      campaignForm.setFieldsValue({
+        ...item,
+        fechaEvento: item.fechaEvento ? dayjs(item.fechaEvento) : null,
+        fechaFin: item.fechaFin ? dayjs(item.fechaFin) : null,
+      });
+    }
+    setCampaignModal(true);
+  }
+
+  async function saveCampaign(vals: Record<string, unknown>) {
+    setCampaignSaving(true);
+    try {
+      const payload = {
+        ...vals,
+        fechaEvento: vals.fechaEvento ? (vals.fechaEvento as dayjs.Dayjs).toISOString() : null,
+        fechaFin: vals.fechaFin ? (vals.fechaFin as dayjs.Dayjs).toISOString() : null,
+      };
+      const url = campaignEditing ? `/api/gestion-web/campana/${campaignEditing.id}` : '/api/gestion-web/campana';
+      const method = campaignEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!r.ok) throw new Error('Error guardando campaña');
+      toast.success(campaignEditing ? 'Campaña actualizada' : 'Campaña creada');
+      setCampaignModal(false);
+      loadCampaigns();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setCampaignSaving(false); }
+  }
+
+  async function deleteCampaign(id: string) {
+    try {
+      await fetch(`/api/gestion-web/campana/${id}`, { method: 'DELETE' });
+      toast.success('Campaña eliminada');
+      loadCampaigns();
+    } catch { toast.error('Error eliminando campaña'); }
+  }
+
   /* ── Deploy ─────────────────────────────────── */
   async function triggerDeploy() {
     setDeploying(true);
@@ -638,6 +704,25 @@ export default function GestionWebPage() {
     },
   ];
 
+  const campaignCols: ColumnsType<Campaign> = [
+    { title: 'Título', dataIndex: 'titulo', key: 'titulo', ellipsis: true },
+    { title: 'Fecha evento', dataIndex: 'fechaEvento', key: 'fechaEvento', width: 120, render: v => v ? dayjs(v).format('DD/MM/YYYY') : '—' },
+    { title: 'Fecha fin', dataIndex: 'fechaFin', key: 'fechaFin', width: 120, render: v => v ? dayjs(v).format('DD/MM/YYYY') : '—' },
+    { title: 'Meta', dataIndex: 'metaUnidades', key: 'metaUnidades', width: 110, render: (v, r) => `${Number(v).toLocaleString()} ${r.unidadLabel}` },
+    { title: 'Aporte', dataIndex: 'aporteSugerido', key: 'aporteSugerido', width: 90, render: v => `$${Number(v)}` },
+    { title: 'Activo', dataIndex: 'activo', key: 'activo', width: 80, render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag> },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openCampaignModal(r)} />
+          <Popconfirm title="¿Eliminar campaña?" onConfirm={() => deleteCampaign(r.id)} okText="Sí" cancelText="No">
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   /* ── Tabs ─────────────────────────────────── */
   const tabItems = [
     {
@@ -664,6 +749,19 @@ export default function GestionWebPage() {
             <Button type="primary" icon={<Plus size={14} />} onClick={() => openCausesModal()}>Nueva causa</Button>
           </div>
           <Table dataSource={causes} columns={causesCols} rowKey="id" loading={causesLoading} size="small" pagination={false} />
+        </div>
+      ),
+    },
+    {
+      key: 'campana', label: 'Campaña activa',
+      children: (
+        <div>
+          <Alert type="info" showIcon style={{ marginBottom: 16 }}
+            message="La campaña activa aparece en el sitio web con countdown, meta de unidades y aporte sugerido. Solo una campaña puede estar activa a la vez." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openCampaignModal()}>Nueva campaña</Button>
+          </div>
+          <Table dataSource={campaigns} columns={campaignCols} rowKey="id" loading={campaignLoading} size="small" pagination={false} />
         </div>
       ),
     },
@@ -967,6 +1065,61 @@ export default function GestionWebPage() {
               </Form.Item>
             </Col>
           </Row>
+        </Form>
+      </Modal>
+
+      {/* Campaign Modal */}
+      <Modal
+        title={campaignEditing ? 'Editar campaña' : 'Nueva campaña'}
+        open={campaignModal}
+        onCancel={() => setCampaignModal(false)}
+        onOk={() => campaignForm.submit()}
+        confirmLoading={campaignSaving}
+        width={640}
+        okText={campaignEditing ? 'Actualizar' : 'Crear'}
+      >
+        <Form form={campaignForm} layout="vertical" onFinish={saveCampaign}>
+          <Form.Item name="titulo" label="Título de la campaña" rules={[{ required: true }]}>
+            <Input placeholder="Ej: Siembra de 1 Millón de mangles" />
+          </Form.Item>
+          <Form.Item name="descripcion" label="Descripción">
+            <Input.TextArea rows={3} placeholder="Describe brevemente la campaña..." />
+          </Form.Item>
+          <Form.Item name="coverImage" label="Imagen de fondo">
+            <CloudinaryUpload folder="asistedcos/campana" aspectHint="16:9 — 1920×1080 recomendado" />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="fechaEvento" label="Fecha del evento (para mostrar en el sitio)">
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" placeholder="26/07/2026" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="fechaFin" label="Fecha límite (countdown)">
+                <DatePicker showTime style={{ width: '100%' }} format="DD/MM/YYYY HH:mm" placeholder="Fin del countdown" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="metaUnidades" label="Meta (unidades)" initialValue={0}>
+                <InputNumber min={0} step={1000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="unidadLabel" label="Nombre de unidad" initialValue="Unidades">
+                <Input placeholder="Ej: Mangles Nativos" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="aporteSugerido" label="Aporte sugerido ($)" initialValue={25}>
+                <InputNumber min={1} prefix="$" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="activo" label="Campaña activa" valuePropName="checked" initialValue={true}>
+            <Switch />
+          </Form.Item>
         </Form>
       </Modal>
 
