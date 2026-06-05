@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import type { EstadoAlertaAml } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ok, apiError } from '@/lib/response';
 import { getCurrentUser } from '@/lib/auth';
@@ -15,7 +16,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     const alerta = await prisma.amlAlerta.findUniqueOrThrow({ where: { id } });
     if (alerta.estado === 'DESCARTADA') return apiError('La alerta ya está descartada', 400);
 
-    let nuevoEstado: string;
+    let nuevoEstado: EstadoAlertaAml;
     if (action === 'revisar')   nuevoEstado = 'REVISADA';
     else if (action === 'descartar') nuevoEstado = 'DESCARTADA';
     else if (action === 'escalar')   nuevoEstado = 'ESCALADA';
@@ -25,7 +26,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       where: { id },
       data: {
         estado:       nuevoEstado,
-        revisadoPor:  user?.id ?? null,
+        revisadoPor:  user?.sub ?? null,
         fechaRevision: new Date(),
         notasRevision: notasRevision ?? null,
         rosId:        action === 'escalar' && rosId ? rosId : undefined,

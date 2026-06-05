@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { ok, apiError } from '@/lib/response';
@@ -43,7 +42,7 @@ export async function GET() {
       prisma.expense.count({ where: { status: 'PENDIENTE' } }),
     ]);
 
-    return NextResponse.json(ok({
+    return ok({
       donors:          totalDonors,
       donationsYear:   Number(totalDonationsYear._sum.amount ?? 0),
       projects:        totalProjects,
@@ -53,7 +52,7 @@ export async function GET() {
       volunteers:      totalVolunteers,
       expensesMonth:   Number(expensesMonth._sum.amount ?? 0),
       pendingExpenses,
-    }));
+    });
 
   } catch (err) {
     return apiError(err);

@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Table, Button, Modal, Form, Input, Switch, Space,
-  Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider,
-  InputNumber, Spin, Progress, Select, Image, Tooltip, Empty, DatePicker,
+  Tabs, Tag, Popconfirm, Row, Col, Alert, Card, Divider, DatePicker,
+  InputNumber, Spin, Progress, Select, Image, Tooltip, Empty,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -193,17 +193,23 @@ type News = {
 type WebContent = { id: string; section: string; key: string; value: string; type: string };
 type GalleryItem = { id: string; title?: string; url: string; category?: string; order: number; createdAt: string };
 type Cause = {
-  id: string; titulo: string; descripcion?: string; tag?: string;
-  coverImage?: string; meta: number; recaudado: number; active: boolean; order: number;
+  id: string; name: string; description?: string; tag?: string;
+  coverImage?: string; ubicacion?: string; estado: string;
+  meta: number; recaudado: number; recaudadoReal: number;
+  active: boolean; webOrder: number; publishOnWeb: boolean;
 };
 type FaqItem = { id: string; question: string; answer: string; order: number; active: boolean };
 type Partner = { id: string; name: string; logo?: string; url?: string; active: boolean; order: number };
+<<<<<<< HEAD
 type Campaign = {
   id: string; titulo: string; descripcion?: string;
   fechaEvento?: string; fechaFin?: string;
   metaUnidades: number; unidadLabel: string;
   aporteSugerido: number; coverImage?: string; activo: boolean;
 };
+=======
+type Testimonial = { id: string; quote: string; name: string; role: string; initials: string; photo?: string; active: boolean; order: number };
+>>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
 
 function slugify(text: string) {
   return text.toLowerCase()
@@ -245,6 +251,7 @@ export default function GestionWebPage() {
   const [causesModal, setCausesModal] = useState(false);
   const [causeEditing, setCauseEditing] = useState<Cause | null>(null);
   const [causesSaving, setCausesSaving] = useState(false);
+  const [causesToggling, setCausesToggling] = useState<string | null>(null);
   const [causesForm] = Form.useForm();
 
   /* ── FAQ ─────────────────────────────────── */
@@ -274,6 +281,14 @@ export default function GestionWebPage() {
   /* ── Deploy ─────────────────────────────────── */
   const [deploying, setDeploying] = useState(false);
 
+  /* ── Testimonios ─────────────────────────────────── */
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonialsLoading, setTestimonialsLoading] = useState(false);
+  const [testimonialsModal, setTestimonialsModal] = useState(false);
+  const [testimonialEditing, setTestimonialEditing] = useState<Testimonial | null>(null);
+  const [testimonialsSaving, setTestimonialsSaving] = useState(false);
+  const [testimonialsForm] = Form.useForm();
+
   /* ── Biblioteca ─────────────────────────────────── */
   const [biblioteca, setBiblioteca] = useState<{ publicId: string; url: string; fullUrl: string; bytes: number; folder: string; createdAt: string }[]>([]);
   const [bibLoading, setBibLoading] = useState(false);
@@ -297,8 +312,13 @@ export default function GestionWebPage() {
       const r = await fetch('/api/gestion-web/contenido');
       const d = await r.json();
       setContent(d.data ?? []);
-      const vals: Record<string, string> = {};
-      (d.data ?? []).forEach((c: WebContent) => { vals[`${c.section}__${c.key}`] = c.value; });
+      const vals: Record<string, unknown> = {};
+      (d.data ?? []).forEach((c: WebContent) => {
+        const formKey = `${c.section}__${c.key}`;
+        if (formKey === 'campaign__active') vals[formKey] = c.value === 'true';
+        else if (formKey === 'campaign__endsAt') vals[formKey] = c.value ? dayjs(c.value) : null;
+        else vals[formKey] = c.value;
+      });
       contentForm.setFieldsValue(vals);
     } catch { toast.error('Error cargando contenido'); }
     finally { setContentLoading(false); }
@@ -344,6 +364,7 @@ export default function GestionWebPage() {
     finally { setPartnersLoading(false); }
   }, []);
 
+<<<<<<< HEAD
   const loadCampaigns = useCallback(async () => {
     setCampaignLoading(true);
     try {
@@ -352,6 +373,16 @@ export default function GestionWebPage() {
       setCampaigns(d.data ?? []);
     } catch { toast.error('Error cargando campañas'); }
     finally { setCampaignLoading(false); }
+=======
+  const loadTestimonials = useCallback(async () => {
+    setTestimonialsLoading(true);
+    try {
+      const r = await fetch('/api/gestion-web/testimonios');
+      const d = await r.json();
+      setTestimonials(d.data ?? []);
+    } catch { toast.error('Error cargando testimonios'); }
+    finally { setTestimonialsLoading(false); }
+>>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
   }, []);
 
   const loadBiblioteca = useCallback(async () => {
@@ -370,7 +401,11 @@ export default function GestionWebPage() {
   useEffect(() => { if (tab === 'causas') loadCauses(); }, [tab, loadCauses]);
   useEffect(() => { if (tab === 'faq') loadFaq(); }, [tab, loadFaq]);
   useEffect(() => { if (tab === 'aliados') loadPartners(); }, [tab, loadPartners]);
+<<<<<<< HEAD
   useEffect(() => { if (tab === 'campana') loadCampaigns(); }, [tab, loadCampaigns]);
+=======
+  useEffect(() => { if (tab === 'testimonios') loadTestimonials(); }, [tab, loadTestimonials]);
+>>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
   useEffect(() => { if (tab === 'biblioteca') loadBiblioteca(); }, [tab, bibFolder, loadBiblioteca]);
 
   /* ── News CRUD ─────────────────────────────────── */
@@ -404,17 +439,23 @@ export default function GestionWebPage() {
   }
 
   /* ── Content CRUD ─────────────────────────────────── */
-  async function saveContent(vals: Record<string, string>) {
+  async function saveContent(vals: Record<string, unknown>) {
     setContentSaving(true);
     try {
-      const IMAGE_KEYS = ['hero__imagen', 'about__imagen'];
+      const IMAGE_KEYS = ['hero__imagen', 'about__imagen', 'campaign__image'];
       const entries = Object.entries(vals)
         .filter(([, value]) => value !== undefined && value !== null)
         .map(([key, value]) => {
           const [section, ...rest] = key.split('__');
           const fieldKey = rest.join('__');
           const type = IMAGE_KEYS.includes(key) ? 'image' : 'text';
-          return { section, key: fieldKey, value: value ?? '', type };
+          const normalizedValue =
+            typeof value === 'boolean'
+              ? String(value)
+              : dayjs.isDayjs(value)
+                ? value.toISOString()
+                : String(value ?? '');
+          return { section, key: fieldKey, value: normalizedValue, type };
         });
       const r = await fetch('/api/gestion-web/contenido', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -461,6 +502,7 @@ export default function GestionWebPage() {
     setCauseEditing(item ?? null);
     causesForm.resetFields();
     if (item) causesForm.setFieldsValue({ ...item, meta: Number(item.meta), recaudado: Number(item.recaudado) });
+    else causesForm.setFieldsValue({ active: true, publishOnWeb: false, estado: 'Activo', meta: 0, recaudado: 0, webOrder: 0 });
     setCausesModal(true);
   }
 
@@ -471,7 +513,7 @@ export default function GestionWebPage() {
       const method = causeEditing ? 'PUT' : 'POST';
       const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
       if (!r.ok) throw new Error((await r.json()).error ?? 'Error');
-      toast.success(causeEditing ? 'Causa actualizada' : 'Causa creada');
+      toast.success(causeEditing ? 'Proyecto actualizado' : 'Proyecto creado');
       setCausesModal(false);
       loadCauses();
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
@@ -481,9 +523,24 @@ export default function GestionWebPage() {
   async function deleteCause(id: string) {
     try {
       await fetch(`/api/gestion-web/causas/${id}`, { method: 'DELETE' });
-      toast.success('Causa eliminada');
+      toast.success('Proyecto eliminado');
       loadCauses();
     } catch { toast.error('Error eliminando'); }
+  }
+
+  async function toggleCausePublishOnWeb(cause: Cause) {
+    setCausesToggling(cause.id);
+    try {
+      const r = await fetch(`/api/gestion-web/causas/${cause.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publishOnWeb: !cause.publishOnWeb }),
+      });
+      if (!r.ok) throw new Error();
+      toast.success(!cause.publishOnWeb ? 'Publicado en la web' : 'Quitado de la web');
+      loadCauses();
+    } catch { toast.error('Error actualizando'); }
+    finally { setCausesToggling(null); }
   }
 
   /* ── FAQ CRUD ─────────────────────────────────── */
@@ -546,6 +603,7 @@ export default function GestionWebPage() {
     } catch { toast.error('Error eliminando'); }
   }
 
+<<<<<<< HEAD
   /* ── Campaña CRUD ─────────────────────────────────── */
   function openCampaignModal(item?: Campaign) {
     setCampaignEditing(item ?? null);
@@ -585,6 +643,36 @@ export default function GestionWebPage() {
       toast.success('Campaña eliminada');
       loadCampaigns();
     } catch { toast.error('Error eliminando campaña'); }
+=======
+  /* ── Testimonials CRUD ─────────────────────────────────── */
+  function openTestimonialsModal(item?: Testimonial) {
+    setTestimonialEditing(item ?? null);
+    testimonialsForm.resetFields();
+    if (item) testimonialsForm.setFieldsValue(item);
+    setTestimonialsModal(true);
+  }
+
+  async function saveTestimonial(vals: Record<string, unknown>) {
+    setTestimonialsSaving(true);
+    try {
+      const url = testimonialEditing ? `/api/gestion-web/testimonios/${testimonialEditing.id}` : '/api/gestion-web/testimonios';
+      const method = testimonialEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) });
+      if (!r.ok) throw new Error((await r.json()).error ?? 'Error');
+      toast.success(testimonialEditing ? 'Testimonio actualizado' : 'Testimonio creado');
+      setTestimonialsModal(false);
+      loadTestimonials();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Error'); }
+    finally { setTestimonialsSaving(false); }
+  }
+
+  async function deleteTestimonial(id: string) {
+    try {
+      await fetch(`/api/gestion-web/testimonios/${id}`, { method: 'DELETE' });
+      toast.success('Testimonio eliminado');
+      loadTestimonials();
+    } catch { toast.error('Error eliminando'); }
+>>>>>>> 54e548f5a047db3d31dc474be1499d7e0a14ba44
   }
 
   /* ── Deploy ─────────────────────────────────── */
@@ -623,22 +711,44 @@ export default function GestionWebPage() {
   ];
 
   const causesCols: ColumnsType<Cause> = [
-    { title: 'Título', dataIndex: 'titulo', key: 'titulo', ellipsis: true },
+    { title: 'Nombre', dataIndex: 'name', key: 'name', ellipsis: true },
     { title: 'Tag', dataIndex: 'tag', key: 'tag', render: v => v ? <Tag color="green">{v}</Tag> : '-', width: 110 },
     {
-      title: 'Progreso', key: 'pct', width: 160, render: (_, r) => {
-        const meta = Number(r.meta); const rec = Number(r.recaudado);
-        const pct = meta > 0 ? Math.round((rec / meta) * 100) : 0;
-        return <Progress percent={pct} size="small" strokeColor="#16a34a" />;
+      title: 'Progreso donaciones', key: 'pct', width: 190, render: (_, r) => {
+        const meta = Number(r.meta);
+        const rec  = Number(r.recaudadoReal ?? r.recaudado);
+        const pct  = meta > 0 ? Math.min(Math.round((rec / meta) * 100), 100) : 0;
+        return (
+          <div>
+            <Progress percent={pct} size="small" strokeColor="#16a34a" />
+            <span style={{ fontSize: 11, color: 'hsl(var(--text-muted))' }}>
+              ${rec.toLocaleString()} / ${meta.toLocaleString()}
+            </span>
+          </div>
+        );
       }
     },
     { title: 'Meta', dataIndex: 'meta', key: 'meta', render: v => `$${Number(v).toLocaleString()}`, width: 90 },
     { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
     {
+      title: <Tooltip title="Visible en el sitio web público"><Globe size={14} /></Tooltip>,
+      dataIndex: 'publishOnWeb', key: 'publishOnWeb', width: 90, align: 'center' as const,
+      render: (_: unknown, r: Cause) => (
+        <Switch
+          size="small"
+          checked={r.publishOnWeb}
+          loading={causesToggling === r.id}
+          onChange={() => toggleCausePublishOnWeb(r)}
+          checkedChildren="Web"
+          unCheckedChildren="No"
+        />
+      ),
+    },
+    {
       title: '', key: 'actions', width: 90, render: (_, r) => (
         <Space>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openCausesModal(r)} />
-          <Popconfirm title="¿Eliminar causa?" onConfirm={() => deleteCause(r.id)} okText="Sí" cancelText="No">
+          <Popconfirm title="¿Eliminar proyecto?" onConfirm={() => deleteCause(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
           </Popconfirm>
         </Space>
@@ -676,6 +786,28 @@ export default function GestionWebPage() {
         <Space>
           <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openFaqModal(r)} />
           <Popconfirm title="¿Eliminar pregunta?" onConfirm={() => deleteFaq(r.id)} okText="Sí" cancelText="No">
+            <Button size="small" danger icon={<Trash size={13} />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const testimonialsCols: ColumnsType<Testimonial> = [
+    {
+      title: '', key: 'avatar', width: 52, render: (_, r) => r.photo
+        ? <img src={r.photo} alt={r.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+        : <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>{r.initials || '?'}</div>
+    },
+    { title: 'Nombre', dataIndex: 'name', key: 'name', width: 150 },
+    { title: 'Cargo / Rol', dataIndex: 'role', key: 'role', width: 160, ellipsis: true },
+    { title: 'Testimonio', dataIndex: 'quote', key: 'quote', ellipsis: true },
+    { title: 'Activo', dataIndex: 'active', key: 'active', render: v => v ? <Tag color="success">Sí</Tag> : <Tag>No</Tag>, width: 80 },
+    {
+      title: '', key: 'actions', width: 90, render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<PencilSimple size={13} />} onClick={() => openTestimonialsModal(r)} />
+          <Popconfirm title="¿Eliminar testimonio?" onConfirm={() => deleteTestimonial(r.id)} okText="Sí" cancelText="No">
             <Button size="small" danger icon={<Trash size={13} />} />
           </Popconfirm>
         </Space>
@@ -744,9 +876,9 @@ export default function GestionWebPage() {
       children: (
         <div>
           <Alert type="info" showIcon style={{ marginBottom: 16 }}
-            message="Las causas aparecen en la página principal del sitio web como tarjetas con barras de progreso de recaudación." />
+            message='Los proyectos son compartidos con el módulo "Proyectos". Activa "Publicar en web" para que aparezcan en el sitio público con barra de progreso.' />
           <div style={{ marginBottom: 16, textAlign: 'right' }}>
-            <Button type="primary" icon={<Plus size={14} />} onClick={() => openCausesModal()}>Nueva causa</Button>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openCausesModal()}>Nuevo proyecto</Button>
           </div>
           <Table dataSource={causes} columns={causesCols} rowKey="id" loading={causesLoading} size="small" pagination={false} />
         </div>
@@ -819,6 +951,19 @@ export default function GestionWebPage() {
       ),
     },
     {
+      key: 'testimonios', label: 'Testimonios',
+      children: (
+        <div>
+          <Alert type="info" showIcon style={{ marginBottom: 16 }}
+            message="Los testimonios aparecen en la sección de testimonios del sitio público. Recomendado: 3-6 testimonios activos." />
+          <div style={{ marginBottom: 16, textAlign: 'right' }}>
+            <Button type="primary" icon={<Plus size={14} />} onClick={() => openTestimonialsModal()}>Nuevo testimonio</Button>
+          </div>
+          <Table dataSource={testimonials} columns={testimonialsCols} rowKey="id" loading={testimonialsLoading} size="small" pagination={false} />
+        </div>
+      ),
+    },
+    {
       key: 'contenido', label: 'Textos del sitio',
       children: (
         <Spin spinning={contentLoading}>
@@ -848,6 +993,95 @@ export default function GestionWebPage() {
             <Form.Item name="about__imagen" label="Imagen de la sección Nosotros/Misión">
               <CloudinaryUpload folder="asistedcos/about" aspectHint="4:3 — 800×600 recomendado" />
             </Form.Item>
+            <Divider>Campaña destacada</Divider>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Aquí ajustas la campaña principal del home y de la página de donar. Puedes cambiarla cada semana o mes sin tocar código."
+            />
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__active" label="Campaña activa" valuePropName="checked">
+                  <Switch />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={16}>
+                <Form.Item name="campaign__slug" label="Slug de campaña (ej: mangles-1m)">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__badge" label="Fecha corta / badge superior">
+                  <Input placeholder="26 mayo 2026" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__title" label="Título principal de campaña">
+                  <Input.TextArea rows={3} placeholder="Siembra de 1 Millón de mangles" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__description" label="Descripción de campaña">
+                  <Input.TextArea rows={4} />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="campaign__image" label="Imagen principal de campaña">
+                  <CloudinaryUpload folder="asistedcos/campanas" aspectHint="16:9 — 1920×1080 recomendado" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__goalLabel" label="Meta destacada">
+                  <Input placeholder="1 Millón" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__goalFigure" label="Meta numérica secundaria">
+                  <Input placeholder="1,000,000" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__unitLabel" label="Unidad / subtítulo de meta">
+                  <Input placeholder="mangles nativos" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__progressPercent" label="Porcentaje de avance">
+                  <InputNumber min={0} max={100} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__impactLabel" label="Etiqueta del avance">
+                  <Input placeholder="Impulso inicial" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__suggestedAmount" label="Monto sugerido (USD)">
+                  <InputNumber min={1} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="campaign__amounts" label="Montos sugeridos">
+                  <Input placeholder="10,25,50,100,250" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__endsAt" label="Fecha y hora fin de campaña">
+                  <DatePicker
+                    showTime
+                    format="DD/MM/YYYY HH:mm"
+                    style={{ width: '100%' }}
+                    placeholder="Selecciona fecha final"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="campaign__volunteerUrl" label="URL botón participar">
+                  <Input placeholder="/contacto?campania=mangles-1m" />
+                </Form.Item>
+              </Col>
+            </Row>
             <Button type="primary" htmlType="submit" loading={contentSaving}>Guardar contenido</Button>
           </Form>
         </Spin>
@@ -871,6 +1105,7 @@ export default function GestionWebPage() {
               <Select.Option value="asistedcos/hero">asistedcos/hero</Select.Option>
               <Select.Option value="asistedcos/about">asistedcos/about</Select.Option>
               <Select.Option value="asistedcos/aliados">asistedcos/aliados</Select.Option>
+              <Select.Option value="asistedcos/campanas">asistedcos/campanas</Select.Option>
               <Select.Option value="asistedcos/ong">asistedcos/ong</Select.Option>
             </Select>
             <Input
@@ -1016,7 +1251,7 @@ export default function GestionWebPage() {
 
       {/* Causes Modal */}
       <Modal
-        title={causeEditing ? 'Editar causa' : 'Nueva causa'}
+        title={causeEditing ? 'Editar proyecto' : 'Nuevo proyecto'}
         open={causesModal}
         onCancel={() => setCausesModal(false)}
         onOk={() => causesForm.submit()}
@@ -1027,7 +1262,7 @@ export default function GestionWebPage() {
         <Form form={causesForm} layout="vertical" onFinish={saveCause}>
           <Row gutter={12}>
             <Col span={16}>
-              <Form.Item name="titulo" label="Título" rules={[{ required: true }]}>
+              <Form.Item name="name" label="Nombre del proyecto" rules={[{ required: true, message: 'El nombre es requerido' }]}>
                 <Input />
               </Form.Item>
             </Col>
@@ -1037,31 +1272,50 @@ export default function GestionWebPage() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="descripcion" label="Descripción">
+          <Form.Item name="description" label="Descripción">
             <Input.TextArea rows={3} />
           </Form.Item>
+          <Form.Item name="ubicacion" label="Ubicación (ej: Playa San Diego, La Libertad)">
+            <Input />
+          </Form.Item>
           <Form.Item name="coverImage" label="Imagen">
-            <CloudinaryUpload folder="asistedcos/causas" aspectHint="4:3 recomendado" />
+            <CloudinaryUpload folder="asistedcos/proyectos" aspectHint="4:3 recomendado" />
           </Form.Item>
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="meta" label="Meta (USD)" rules={[{ required: true }]}>
+              <Form.Item name="meta" label="Meta (USD)">
                 <InputNumber min={0} step={1000} prefix="$" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="recaudado" label="Recaudado (USD)" rules={[{ required: true }]}>
+              <Form.Item name="recaudado" label="Recaudado (USD)">
                 <InputNumber min={0} step={100} prefix="$" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={4}>
-              <Form.Item name="order" label="Orden">
+            <Col span={8}>
+              <Form.Item name="estado" label="Estado" initialValue="Activo">
+                <Select>
+                  <Select.Option value="Activo">Activo</Select.Option>
+                  <Select.Option value="Continuo">Continuo</Select.Option>
+                  <Select.Option value="Completado">Completado</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="webOrder" label="Orden en web">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={4}>
+            <Col span={8}>
               <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
-                <Switch />
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="publishOnWeb" label="Publicar en web" valuePropName="checked" initialValue={false}>
+                <Switch checkedChildren="Sí" unCheckedChildren="No" />
               </Form.Item>
             </Col>
           </Row>
@@ -1165,6 +1419,53 @@ export default function GestionWebPage() {
           </Form.Item>
           <Form.Item name="answer" label="Respuesta" rules={[{ required: true }]}>
             <Input.TextArea rows={4} />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="order" label="Orden" initialValue={0}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="active" label="Activo" valuePropName="checked" initialValue={true}>
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Testimonials Modal */}
+      <Modal
+        title={testimonialEditing ? 'Editar testimonio' : 'Nuevo testimonio'}
+        open={testimonialsModal}
+        onCancel={() => setTestimonialsModal(false)}
+        onOk={() => testimonialsForm.submit()}
+        confirmLoading={testimonialsSaving}
+        width={560}
+        okText={testimonialEditing ? 'Actualizar' : 'Crear'}
+      >
+        <Form form={testimonialsForm} layout="vertical" onFinish={saveTestimonial}>
+          <Form.Item name="quote" label="Testimonio" rules={[{ required: true, message: 'El testimonio es requerido' }]}>
+            <Input.TextArea rows={3} placeholder="Escribe el testimonio aquí..." />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={14}>
+              <Form.Item name="name" label="Nombre completo" rules={[{ required: true }]}>
+                <Input placeholder="María López" />
+              </Form.Item>
+            </Col>
+            <Col span={10}>
+              <Form.Item name="initials" label="Iniciales (avatar)" rules={[{ required: true }]}>
+                <Input placeholder="ML" maxLength={3} style={{ textTransform: 'uppercase' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="role" label="Cargo / Rol" rules={[{ required: true }]}>
+            <Input placeholder="Pescadora, La Libertad" />
+          </Form.Item>
+          <Form.Item name="photo" label="Foto de perfil (opcional — reemplaza las iniciales)">
+            <CloudinaryUpload folder="asistedcos/testimonios" aspectHint="1:1 cuadrada recomendado" />
           </Form.Item>
           <Row gutter={12}>
             <Col span={8}>

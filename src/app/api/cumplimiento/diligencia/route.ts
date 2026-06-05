@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         estado:              estado              ?? 'PENDIENTE',
         observaciones:       observaciones       ?? null,
         documentos:          documentos          ?? null,
-        revisadoPor:         user?.id            ?? null,
+        revisadoPor:         user?.sub           ?? null,
         fechaRevision:       estado && estado !== 'PENDIENTE' ? new Date() : null,
         proximaRevision:     proximaRevision     ? new Date(proximaRevision) : null,
       },

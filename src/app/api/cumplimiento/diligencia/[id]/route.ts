@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
         estado:              estado             ?? undefined,
         observaciones:       observaciones      ?? null,
         documentos:          documentos         ?? undefined,
-        revisadoPor:         user?.id           ?? null,
+        revisadoPor:         user?.sub          ?? null,
         fechaRevision:       estado && estado !== previo.estado ? new Date() : undefined,
         proximaRevision:     proximaRevision    ? new Date(proximaRevision) : null,
       },

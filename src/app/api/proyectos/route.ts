@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const { page, limit, skip } = parsePagination(req);
     const activeOnly = req.nextUrl.searchParams.get('active') === 'true';
     const where = activeOnly ? { active: true } : {};
-    const [data, total] = await Promise.all([
+    const [projects, total] = await Promise.all([
       prisma.project.findMany({
         where, orderBy: { createdAt: 'desc' },
         skip, take: limit,
@@ -21,6 +21,17 @@ export async function GET(req: NextRequest) {
       }),
       prisma.project.count({ where }),
     ]);
+
+    const donationSums = await prisma.donation.groupBy({
+      by: ['projectId'],
+      _sum: { amount: true },
+      where: { projectId: { in: projects.map(p => p.id) } },
+    });
+    const sumMap = Object.fromEntries(
+      donationSums.map(d => [d.projectId, Number(d._sum.amount ?? 0)])
+    );
+    const data = projects.map(p => ({ ...p, recaudadoReal: sumMap[p.id] ?? 0 }));
+
     return paginate(data, total, page, limit);
   } catch (err) { return apiError(err); }
 }
@@ -30,7 +41,7 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
     const body = await req.json();
-    const { name, description, startDate, endDate, budget } = body;
+    const { name, description, startDate, endDate, budget, coverImage, publishOnWeb, tag, ubicacion, estado, meta, recaudado, webOrder } = body;
     if (!name?.trim()) throw new ValidationError('El nombre del proyecto es requerido');
     const project = await prisma.project.create({
       data: {
@@ -39,6 +50,14 @@ export async function POST(req: NextRequest) {
         startDate: startDate ? new Date(startDate) : null,
         endDate:   endDate   ? new Date(endDate)   : null,
         budget:    budget ? parseFloat(budget) : 0,
+        coverImage: coverImage || null,
+        publishOnWeb: publishOnWeb ?? false,
+        tag:      tag      || null,
+        ubicacion: ubicacion || null,
+        estado:   estado   ?? 'Activo',
+        meta:     meta     ? parseFloat(meta) : 0,
+        recaudado: recaudado ? parseFloat(recaudado) : 0,
+        webOrder: webOrder ?? 0,
       },
     });
     return created(project);

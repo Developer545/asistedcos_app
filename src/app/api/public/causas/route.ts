@@ -14,10 +14,39 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    const causes = await prisma.webCause.findMany({
-      where: { active: true },
-      orderBy: { order: 'asc' },
+    const projects = await prisma.project.findMany({
+      where: { publishOnWeb: true, active: true },
+      orderBy: { webOrder: 'asc' },
     });
+
+    // Sum real donations per project
+    const donationSums = await prisma.donation.groupBy({
+      by: ['projectId'],
+      _sum: { amount: true },
+      where: { projectId: { in: projects.map(p => p.id) } },
+    });
+    const sumMap = Object.fromEntries(
+      donationSums.map(d => [d.projectId, Number(d._sum.amount ?? 0)])
+    );
+
+    // Map to WebCause-compatible shape for ong-web compatibility
+    const causes = projects.map(p => ({
+      id:          p.id,
+      titulo:      p.name,
+      descripcion: p.description,
+      tag:         p.tag,
+      coverImage:  p.coverImage,
+      ubicacion:   p.ubicacion,
+      estado:      p.estado,
+      meta:        p.meta,
+      recaudado:   sumMap[p.id] ?? Number(p.recaudado),
+      active:      p.active,
+      order:       p.webOrder,
+      startDate:   p.startDate,
+      endDate:     p.endDate,
+      createdAt:   p.createdAt,
+      updatedAt:   p.updatedAt,
+    }));
     return NextResponse.json({ success: true, data: causes });
   } catch { return NextResponse.json({ success: true, data: [] }); }
 }

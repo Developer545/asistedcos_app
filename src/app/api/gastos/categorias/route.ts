@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { ok, created, apiError } from '@/lib/response';
@@ -12,7 +12,7 @@ export async function GET() {
       orderBy: { name: 'asc' },
       include: { _count: { select: { expenses: true } } },
     });
-    return NextResponse.json(ok(cats));
+    return ok(cats);
   } catch (err) { return apiError(err); }
 }
 
@@ -26,6 +26,6 @@ export async function POST(req: NextRequest) {
     const cat = await prisma.expenseCategory.create({
       data: { name: name.trim(), description: description || null },
     });
-    return NextResponse.json(created(cat));
+    return created(cat);
   } catch (err) { return apiError(err); }
 }

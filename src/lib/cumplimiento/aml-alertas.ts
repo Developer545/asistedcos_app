@@ -18,7 +18,13 @@ export function triggerAmlDonacion(donationId: string) {
       });
       if (!don) return;
 
-      const alertas: Parameters<typeof prisma.amlAlerta.createMany>[0]['data'] = [];
+      const alertas: {
+        tipo: 'EFECTIVO_ALTO' | 'DONANTE_SIN_DD';
+        donorId: string;
+        donationId: string;
+        descripcion: string;
+        montoInvolucrado?: number;
+      }[] = [];
 
       // Alerta 1: efectivo >= $10,000
       if (don.paymentMethod === 'EFECTIVO' && Number(don.amount) >= 10000) {
