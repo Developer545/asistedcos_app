@@ -204,7 +204,7 @@ type Partner = { id: string; name: string; logo?: string; url?: string; active: 
 type Campaign = {
   id: string; titulo: string; descripcion?: string;
   fechaEvento?: string; fechaFin?: string;
-  metaUnidades: number; unidadLabel: string;
+  metaUnidades: number; recaudadoUnidades: number; unidadLabel: string;
   aporteSugerido: number; coverImage?: string; activo: boolean;
 };
 =======
@@ -1355,17 +1355,22 @@ export default function GestionWebPage() {
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="metaUnidades" label="Meta (unidades)" initialValue={0}>
                 <InputNumber min={0} step={1000} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
+              <Form.Item name="recaudadoUnidades" label="Recaudado (unidades)" initialValue={0}>
+                <InputNumber min={0} step={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item name="unidadLabel" label="Nombre de unidad" initialValue="Unidades">
                 <Input placeholder="Ej: Mangles Nativos" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="aporteSugerido" label="Aporte sugerido ($)" initialValue={25}>
                 <InputNumber min={1} prefix="$" style={{ width: '100%' }} />
               </Form.Item>

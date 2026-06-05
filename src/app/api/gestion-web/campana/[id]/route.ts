@@ -8,7 +8,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await getCurrentUser();
     const { id } = await params;
     const body = await req.json();
-    const { titulo, descripcion, fechaEvento, fechaFin, metaUnidades, unidadLabel, aporteSugerido, coverImage, activo } = body;
+    const { titulo, descripcion, fechaEvento, fechaFin, metaUnidades, recaudadoUnidades, unidadLabel, aporteSugerido, coverImage, activo } = body;
     const campaign = await prisma.webCampaign.update({
       where: { id },
       data: {
@@ -17,6 +17,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         fechaEvento: fechaEvento ? new Date(fechaEvento) : null,
         fechaFin: fechaFin ? new Date(fechaFin) : null,
         metaUnidades: metaUnidades ?? 0,
+        recaudadoUnidades: recaudadoUnidades ?? 0,
         unidadLabel: unidadLabel ?? 'Unidades',
         aporteSugerido: aporteSugerido ?? 25,
         coverImage,

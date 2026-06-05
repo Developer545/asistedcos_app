@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   try {
     await getCurrentUser();
     const body = await req.json();
-    const { titulo, descripcion, fechaEvento, fechaFin, metaUnidades, unidadLabel, aporteSugerido, coverImage, activo } = body;
+    const { titulo, descripcion, fechaEvento, fechaFin, metaUnidades, recaudadoUnidades, unidadLabel, aporteSugerido, coverImage, activo } = body;
     if (!titulo?.trim()) return apiError('El título es requerido', 400);
     const campaign = await prisma.webCampaign.create({
       data: {
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         fechaEvento: fechaEvento ? new Date(fechaEvento) : null,
         fechaFin: fechaFin ? new Date(fechaFin) : null,
         metaUnidades: metaUnidades ?? 0,
+        recaudadoUnidades: recaudadoUnidades ?? 0,
         unidadLabel: unidadLabel ?? 'Unidades',
         aporteSugerido: aporteSugerido ?? 25,
         coverImage,

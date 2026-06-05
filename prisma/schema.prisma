@@ -785,9 +785,10 @@ model WebCampaign {
   descripcion    String?
   fechaEvento    DateTime?
   fechaFin       DateTime?
-  metaUnidades   Int       @default(0)
-  unidadLabel    String    @default("Unidades")
-  aporteSugerido Decimal   @default(25) @db.Decimal(10, 2)
+  metaUnidades       Int       @default(0)
+  recaudadoUnidades  Int       @default(0)
+  unidadLabel        String    @default("Unidades")
+  aporteSugerido     Decimal   @default(25) @db.Decimal(10, 2)
   coverImage     String?
   activo         Boolean   @default(true)
   createdAt      DateTime  @default(now())
